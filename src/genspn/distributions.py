@@ -191,8 +191,11 @@ def logpdf(dist: Mixed, x: Datapoint) -> Float[Array, ""]:
 
 @dispatch
 def logpdf(dist: GEM, pi: Float[Array, "n"], K: Integer[Array, ""]) -> Float[Array, ""]:
-    betas = jax.vmap(lambda i: 1 - pi[i] / pi[i-1])(jnp.arange(len(pi)))
-    betas = betas.at[0].set(pi[0])
+    def unfold(carry, pi):
+        beta = pi / carry
+        return carry * (1-beta), beta
+
+    _, betas = jax.lax.scan(unfold, 1.0, pi)
     logprobs = jax.vmap(jax.scipy.stats.beta.logpdf, in_axes=(0, None, 0))(betas, 1-dist.d, dist.alpha + (1 + jnp.arange(len(pi))) * dist.d)
     idx = jnp.arange(logprobs.shape[0])
     logprobs = jnp.where(idx < K, logprobs, 0) 

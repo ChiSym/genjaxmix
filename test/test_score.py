@@ -24,15 +24,12 @@ def test_score_stick_breaking():
     logp0 = logpdf(gem, pis0, K)
     logp1 = logpdf(gem, pis1, K)
 
-    assert logp0 == (
-        jax.scipy.stats.beta.logpdf(pis0[0], 1 - d, alpha + d) +
-        jax.scipy.stats.beta.logpdf(1 - pis0[1]/pis0[0], 1 - d, alpha + 2 * d)
-    )
+    logp0_expected = jax.scipy.stats.beta.logpdf(pis0[0], 1 - d, alpha + d) + jax.scipy.stats.beta.logpdf(pis0[1]/(1-pis0[0]), 1 - d, alpha + 2 * d)
+    assert logp0 == logp0_expected 
 
-    assert logp1 == (
-        jax.scipy.stats.beta.logpdf(pis1[0], 1 - d, alpha + d) +
-        jax.scipy.stats.beta.logpdf(1 - pis1[1]/pis1[0], 1 - d, alpha + 2 * d)
-    )
+    logp1_expected = jax.scipy.stats.beta.logpdf(pis1[0], 1 - d, alpha + d) + jax.scipy.stats.beta.logpdf(pis1[1]/(1-pis1[0]), 1 - d, alpha + 2 * d)
+
+    assert logp1 == logp1_expected
 
 def test_score_data():
     x = jnp.zeros((5, 6))
