@@ -1,0 +1,23 @@
+site_name: GenJAXMix
+
+theme:
+  name: "material"
+  # features:
+  #   - navigation.tabs
+  #   - toc.follow
+  #   - toc.integrate
+
+# markdown_extensions:
+#   - toc
+
+plugins:
+  - mkdocs-jupyter
+
+nav: 
+  - Home: index.md
+  - Tutorials: 
+    - Getting Started: tutorials/getting_started.md
+    - Analyzing Heart Diesease Patients: tutorials/heart_disease.md
+    - Test: tutorials/test.py
+  - Library Reference: api.md
+  - For Developers: dev.md
