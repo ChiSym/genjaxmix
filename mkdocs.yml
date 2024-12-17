@@ -11,7 +11,8 @@ theme:
 #   - toc
 
 plugins:
-  - mkdocs-jupyter
+  - mkdocs-jupyter:
+      execute: true
 
 nav: 
   - Home: index.md
