@@ -1,7 +1,69 @@
-from genspn.distributions import Normal, Categorical, Dirichlet, NormalInverseGamma, Mixed, logpdf, posterior, sample
+from genspn.distributions import (Normal, Categorical, Dirichlet, NormalInverseGamma, Mixed, 
+    logpdf, posterior, sample, PiecewiseUniform, DirichletPiecewiseUniform)
 import jax.numpy as jnp
 import jax
+from astropy.stats import bayesian_blocks
+from scipy import stats
+import numpy as np
 
+def test_continuous_uniform():
+    jax.config.update("jax_traceback_filtering", "off")
+    N = 5000
+    key = jax.random.PRNGKey(1234)
+    x = jax.random.gamma(key, 2, shape=(N,))
+    y = jax.random.normal(key, shape=(N,))
+
+    breaks1 = bayesian_blocks(x, fitness='events')
+    breaks2 = bayesian_blocks(y, fitness='events')
+
+    max_length = max(len(breaks1), len(breaks2))
+
+    breaks = -10000 * np.ones((2, max_length))
+    breaks[0, :len(breaks1)] = breaks1
+    breaks[1, :len(breaks2)] = breaks2
+    breaks = jnp.array(breaks)
+
+    xy = jnp.vstack((x, y))
+
+    greater_than_x = xy[:, :, None] >= breaks[:, None, :-1]
+    less_than_x = xy[:, :, None] <= breaks[:, None, 1:]
+
+    in_interval = greater_than_x & less_than_x
+
+    total_intervals = jnp.sum(in_interval, axis=-1)
+
+    assert jnp.all(total_intervals == 1)
+    probs = jnp.sum(in_interval, axis=-2) / xy.shape[-1]
+
+    dist = PiecewiseUniform(breaks=breaks, logweights=jnp.log(probs))
+
+    keys = jax.random.split(key, 1000)
+    vals = jax.vmap(sample, in_axes=(0, None))(keys, dist)
+
+    means = jnp.mean(vals, axis=0)
+    xy_means = jnp.mean(xy, axis=-1)
+
+    assert np.abs(means[0] - xy_means[0]) < 5e-2
+    assert np.abs(means[1] - xy_means[1]) < 5e-2
+
+
+    logpdfs = logpdf(dist, xy[:, 0])
+
+    idx1 = np.where(breaks1 >= xy[0, 0])[0][0] - 1
+    logpdf1 = dist.logweights[0][idx1] - np.log(breaks1[idx1+1] - breaks1[idx1])
+
+    idx2 = np.where(breaks2 >= xy[1, 0])[0][0] - 1
+    logpdf2 = dist.logweights[1][idx2] - np.log(breaks2[idx2+1] - breaks2[idx2])
+
+    assert jnp.isclose(logpdfs, logpdf1 + logpdf2)
+
+    prior = DirichletPiecewiseUniform(breaks=breaks, alpha=jnp.ones_like(dist.logweights))
+    c = jnp.zeros(N, dtype=jnp.int32)
+    piecewise_posterior = posterior(prior, xy.T, c)
+
+    counts = jnp.sum(in_interval, axis=-2)
+
+    assert jnp.all(piecewise_posterior.alpha == counts + 1)
 
 def test_posterior_dirichlet():
     n_dim = 2

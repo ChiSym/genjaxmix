@@ -34,7 +34,7 @@ def run_experiment(max_clusters, gibbs_iters, alpha, d, schema, train_data, test
         pi=cluster.pi/jnp.sum(cluster.pi), 
         f=cluster.f[:max_clusters])
 
-    return time_elapsed, sum_logprobs, trace, jax.vmap(logpdf, in_axes=(None, 0))(mixture_model, valid_data)
+    return time_elapsed, sum_logprobs, trace, jax.vmap(logpdf, in_axes=(None, 0))(mixture_model, (valid_data,))
 
 def run_experiment_wrapper(seed, dataset_name, n_replicates, max_clusters, gibbs_iters, alpha, d):
     key = jax.random.PRNGKey(seed)

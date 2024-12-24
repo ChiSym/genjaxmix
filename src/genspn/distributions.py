@@ -20,6 +20,13 @@ class Dirichlet(eqx.Module):
     def __getitem__(self, key):
         return Dirichlet(alpha=self.alpha[key])
 
+class DirichletPiecewiseUniform(eqx.Module):
+    breaks: Float[Array, "*batch n_dim n_slices + 1"]
+    alpha: Float[Array, "*batch n_dim n_slices"]
+
+    def __getitem__(self, key):
+        return DirichletPiecewiseUniform(breaks=self.breaks[key], alpha=self.alpha[key])
+
 class Normal(eqx.Module):
     mu: Float[Array, "*batch n_dim"]
     std: Float[Array, "*batch n_dim"]
@@ -27,14 +34,21 @@ class Normal(eqx.Module):
     def __getitem__(self, key):
         return Normal(mu=self.mu[key], std=self.std[key])
 
+class PiecewiseUniform(eqx.Module):
+    breaks: Float[Array, "*batch n_dim n_slices + 1"]
+    logweights: Float[Array, "*batch n_dim n_slices"]
+
+    def __getitem__(self, key):
+        return PiecewiseUniform(breaks=self.breaks[key], logweights=self.logweights[key])
+
 class Categorical(eqx.Module):
     # assumed normalized, padded
     logprobs: Float[Array, "*batch n_dim k"]
     def __getitem__(self, key):
         return Categorical(logprobs=self.logprobs[key])
 
-type BaseF = Categorical | Normal
-type BaseG = NormalInverseGamma | Dirichlet
+type BaseF = Categorical | Normal | PiecewiseUniform
+type BaseG = NormalInverseGamma | Dirichlet | DirichletPiecewiseUniform
 
 class Mixed(eqx.Module):
     dists: tuple[BaseF, ...]
@@ -79,6 +93,24 @@ def sample(key: Array, dist: Dirichlet) -> Categorical:
     probs = jnp.where(probs == 0, ZERO, probs)
 
     return Categorical(jnp.log(probs))
+
+@dispatch
+def sample(key: Array, dist: DirichletPiecewiseUniform) -> PiecewiseUniform:
+    probs = jax.random.dirichlet(key, dist.alpha)
+    probs = jnp.where(probs == 0, ZERO, probs)
+
+    return PiecewiseUniform(breaks=dist.breaks, logweights=jnp.log(probs))
+
+@dispatch
+def sample(key: Array, dist: PiecewiseUniform) -> Float[Array, "n_dim"]:
+    slice_idx = jax.random.categorical(key, dist.logweights)
+    slice_idx = slice_idx[..., None]
+    slice0 = jnp.take_along_axis(dist.breaks, slice_idx, axis=-1)[..., 0]
+    slice1 = jnp.take_along_axis(dist.breaks, slice_idx + 1, axis=-1)[..., 0]
+
+    delta = slice1 - slice0
+    uniform = jax.random.uniform(key, delta.shape)
+    return slice0 + delta * uniform
 
 @dispatch 
 def sample(key: Array, dist: NormalInverseGamma) -> Normal:
@@ -166,6 +198,20 @@ def posterior(dist: NormalInverseGamma, N: Integer[Array, ""], sum_x: Float[Arra
     return NormalInverseGamma(m=m, l=l, a=a, b=b)
 
 @dispatch
+def posterior(dist: DirichletPiecewiseUniform, x: Float[Array, "batch n_dim"], c: Integer[Array, "batch"], max_clusters:Optional[int]=None) -> DirichletPiecewiseUniform:
+    greater_than_x = x[..., None] >= dist.breaks[..., :-1]
+    less_than_x = x[..., None] <= dist.breaks[..., 1:]
+    in_interval = greater_than_x & less_than_x
+    in_interval = in_interval.astype(jnp.int32)
+    counts = jax.ops.segment_sum(in_interval, c, num_segments=max_clusters)
+
+    return jax.vmap(posterior, in_axes=(None, 0))(dist, counts)
+
+@dispatch
+def posterior(dist: DirichletPiecewiseUniform, counts: Integer[Array, "n_dim n_intervals"]) -> DirichletPiecewiseUniform:
+    return DirichletPiecewiseUniform(breaks=dist.breaks, alpha=dist.alpha + counts)
+
+@dispatch
 def posterior(dist: Dirichlet, x: Integer[Array, "batch n_dim"], c: Integer[Array, "batch"], max_clusters:Optional[int]=None) -> Dirichlet:
     one_hot_x = jax.nn.one_hot(x, num_classes=dist.alpha.shape[-1], dtype=jnp.int32)
     counts = jax.ops.segment_sum(one_hot_x, c, num_segments=max_clusters)
@@ -228,6 +274,17 @@ def logpdf(dist: NormalInverseGamma, x: Normal)-> Float[Array, ""]:
 @dispatch
 def logpdf(dist: Dirichlet, x: Categorical)-> Float[Array, ""]:
     logprobs = jax.vmap(jax.scipy.stats.dirichlet.logpdf)(jnp.exp(x.logprobs), dist.alpha)
+    return jnp.sum(logprobs)
+
+@dispatch
+def logpdf(dist: PiecewiseUniform, x: Float[Array, "n_dim"]) -> Float[Array, ""]:
+    greater_than_x = x[..., None] >= dist.breaks[..., :-1]
+    less_than_x = x[..., None] <= dist.breaks[..., 1:]
+    in_interval = greater_than_x & less_than_x
+
+    bin_lengths = dist.breaks[..., 1:] - dist.breaks[..., :-1]
+    logprobs = (dist.logweights - jnp.log(bin_lengths)) * in_interval
+
     return jnp.sum(logprobs)
 
 def make_trace(
