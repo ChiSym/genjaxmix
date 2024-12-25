@@ -88,6 +88,7 @@ config = dataset.card_data['configs']
 
 
 dataset_names = [c['data_files'][0]['path'].rpartition('/')[0] for c in config]
+dataset_names = [d for d in dataset_names if "CTGAN" in d]
 n_replicates = 1
 seed = 1234
 max_clusters = 300

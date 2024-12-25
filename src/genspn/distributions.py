@@ -5,8 +5,10 @@ from jaxtyping import Array, Float, Integer
 from plum import dispatch
 from typing import Optional
 from numbers import Real
+import numpy as np
 
 ZERO = 1e-20
+ALPHA = 1e-3  # Dirichlet prior for categorical variables
 
 class NormalInverseGamma(eqx.Module):
     m: Float[Array, "*batch n_dim"]
@@ -169,7 +171,6 @@ def posterior(dist: MixedConjugate, x: Integer[Array, "batch n_dim"], c: Integer
     dists = tuple([posterior(dist.dists[i], x[i], c, max_clusters) for i in range(len(dist.dists))])
 
     return MixedConjugate(dists=dists)
-###
 
 @dispatch
 def posterior(dist: NormalInverseGamma, x: Float[Array, "batch n_dim"], c: Integer[Array, "batch"], max_clusters:Optional[int]=None) -> NormalInverseGamma:
@@ -199,6 +200,7 @@ def posterior(dist: NormalInverseGamma, N: Integer[Array, ""], sum_x: Float[Arra
 
 @dispatch
 def posterior(dist: DirichletPiecewiseUniform, x: Float[Array, "batch n_dim"], c: Integer[Array, "batch"], max_clusters:Optional[int]=None) -> DirichletPiecewiseUniform:
+    # TODO check how this handles NaNs
     greater_than_x = x[..., None] >= dist.breaks[..., :-1]
     less_than_x = x[..., None] <= dist.breaks[..., 1:]
     in_interval = greater_than_x & less_than_x
@@ -277,6 +279,11 @@ def logpdf(dist: Dirichlet, x: Categorical)-> Float[Array, ""]:
     return jnp.sum(logprobs)
 
 @dispatch
+def logpdf(dist: DirichletPiecewiseUniform, x: PiecewiseUniform)-> Float[Array, ""]:
+    logprobs = jax.vmap(jax.scipy.stats.dirichlet.logpdf)(jnp.exp(x.logweights), dist.alpha)
+    return jnp.sum(logprobs)
+
+@dispatch
 def logpdf(dist: PiecewiseUniform, x: Float[Array, "n_dim"]) -> Float[Array, ""]:
     greater_than_x = x[..., None] >= dist.breaks[..., :-1]
     less_than_x = x[..., None] <= dist.breaks[..., 1:]
@@ -285,7 +292,7 @@ def logpdf(dist: PiecewiseUniform, x: Float[Array, "n_dim"]) -> Float[Array, ""]
     bin_lengths = dist.breaks[..., 1:] - dist.breaks[..., :-1]
     logprobs = (dist.logweights - jnp.log(bin_lengths)) * in_interval
 
-    return jnp.sum(logprobs)
+    return jnp.nansum(logprobs)
 
 def make_trace(
         key: jax.Array, alpha: Real, d: Real, 
@@ -312,8 +319,11 @@ def make_trace(
 
 def make_g(schema: dict):
     dists = []
+
     if schema["types"]["normal"]:
         dists.append(make_normal_g(schema))
+    if schema["types"]["piecewise_uniform"]:
+        dists.append(make_piecewise_uniform_g(schema))
     if schema["types"]["categorical"]:
         dtypes = schema["var_metadata"]["categorical_precisions"]
         unique_dtypes = list(set(dtypes))
@@ -321,6 +331,25 @@ def make_g(schema: dict):
             dists.append(make_categorical_g(schema, dtype))
 
     return MixedConjugate(dists=dists)
+
+def make_piecewise_uniform_g(schema: dict):
+    # here, we are assuming that all variables have the same number of breaks
+    variables = schema["types"]["piecewise_uniform"]
+    breaks = jnp.vstack([schema["var_metadata"][v]["breaks"] for v in variables])
+
+    # min_val = np.min([np.min(b) for b in breaks]) - 1
+
+    # n_breaks = jnp.array([len(b) for b in breaks])
+    # max_n_breaks = jnp.max(n_breaks).astype(int)
+    # breaks_arr = min_val * np.ones((len(variables), max_n_breaks)) 
+
+    # breaks_alpha = ALPHA * jnp.ones((len(variables), max_n_breaks))
+    # mask = jnp.tile(jnp.arange(max_n_breaks), (len(variables), 1)) < n_breaks[:, None]
+    # breaks_alpha = jnp.where(mask, breaks_alpha, ZERO)
+
+    # for i, b in enumerate(breaks):
+    #     breaks_arr[i, :len(b)] = b
+    return DirichletPiecewiseUniform(breaks=breaks, alpha=ALPHA * jnp.ones((breaks.shape[0], breaks.shape[1] - 1)))
 
 def make_normal_g(schema: dict):
     n_continuous = len(schema["types"]["normal"])
@@ -337,7 +366,7 @@ def make_categorical_g(schema: dict, dtype: int):
                               if dtypes[idx] == dtype])
     max_n_categories = jnp.max(n_categories).astype(int)
 
-    cat_alpha = jnp.ones((n_discrete, max_n_categories))
+    cat_alpha = ALPHA * jnp.ones((n_discrete, max_n_categories))
     mask = jnp.tile(jnp.arange(max_n_categories), (n_discrete, 1)) < n_categories[:, None]
     cat_alpha = jnp.where(mask, cat_alpha, ZERO)
 

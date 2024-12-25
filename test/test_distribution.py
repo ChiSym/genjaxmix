@@ -1,8 +1,8 @@
 from genspn.distributions import (Normal, Categorical, Dirichlet, NormalInverseGamma, Mixed, 
     logpdf, posterior, sample, PiecewiseUniform, DirichletPiecewiseUniform)
+from genspn.histogram import histogram
 import jax.numpy as jnp
 import jax
-from astropy.stats import bayesian_blocks
 from scipy import stats
 import numpy as np
 
@@ -13,8 +13,8 @@ def test_continuous_uniform():
     x = jax.random.gamma(key, 2, shape=(N,))
     y = jax.random.normal(key, shape=(N,))
 
-    breaks1 = bayesian_blocks(x, fitness='events')
-    breaks2 = bayesian_blocks(y, fitness='events')
+    breaks1, _ = histogram(x)
+    breaks2, _ = histogram(y)
 
     max_length = max(len(breaks1), len(breaks2))
 

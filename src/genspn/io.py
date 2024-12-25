@@ -8,19 +8,23 @@ from plum import dispatch
 import os
 from safetensors import safe_open
 from safetensors.flax import save_file
+from joblib import Memory
+from genspn.histogram import histogram
+
+memory = Memory("cachedir")
 
 
 def dataframe_to_arrays(df: pl.DataFrame):
     schema = make_schema(df)
     categorical_df = df.select(schema["types"]["categorical"])
-    numerical_df = df.select(schema["types"]["normal"])
+    numerical_df = df.select(schema["types"]["piecewise_uniform"])
 
-    def normalize(col: pl.Expr):
-        return (col - schema["var_metadata"][col.name]["mean"]) / schema["var_metadata"][col.name]["std"]
+    # def normalize(col: pl.Expr):
+    #     return (col - schema["var_metadata"][col.name]["mean"]) / schema["var_metadata"][col.name]["std"]
 
-    numerical_df = numerical_df.with_columns(
-        pl.all().map_batches(normalize)
-    )
+    # numerical_df = numerical_df.with_columns(
+    #     pl.all().map_batches(normalize)
+    # )
 
     numerical_array  = None if numerical_df.is_empty() else jnp.array(numerical_df.to_numpy())
     categorical_arrays, schema = (None, schema) if categorical_df.is_empty() else categorical_df_to_integer(categorical_df, schema)
@@ -70,8 +74,8 @@ def get_dtype(n_categories):
 
 def load_huggingface(dataset_path):
     splits = {
-        "train": f"{dataset_path}/data-train.parquet",
-        "test": f"{dataset_path}/data-test.parquet"
+        "train": f"{dataset_path}/data-train-num.parquet",
+        "test": f"{dataset_path}/data-test-full-num.parquet"
     }
     train_df = pl.read_parquet(f"hf://datasets/Large-Population-Model/model-building-evaluation/{splits['train']}")
     test_df = pl.read_parquet(f"hf://datasets/Large-Population-Model/model-building-evaluation/{splits['test']}")
@@ -134,9 +138,16 @@ def split_data(data: Float[Array, "n n_c"] | Integer[Array, "n n_d"], test_ratio
 
     return train_data, test_data
 
+@memory.cache
+def get_breaks(arr: Float[Array, "n"]):
+    # return bayesian_blocks(arr, fitness='events')
+    breaks, _ = histogram(arr, max_bins=20)
+    return breaks
+
 def make_schema(df: pl.DataFrame):
     schema = {
         "types":{
+            "piecewise_uniform": [],
             "normal": [],
             "categorical": []
         },
@@ -147,8 +158,9 @@ def make_schema(df: pl.DataFrame):
             schema["types"]["categorical"].append(c)
             schema["var_metadata"][c] = {"levels": df[c].drop_nulls().unique().sort().to_list()}
         elif df[c].dtype == pl.Float64:
-            schema["types"]["normal"].append(c)
-            schema["var_metadata"][c] = {"mean": df[c].mean(), "std": df[c].std()}
+            schema["types"]["piecewise_uniform"].append(c)
+            breaks = get_breaks(df[c].drop_nulls().to_numpy())
+            schema["var_metadata"][c] = {"breaks": breaks}
         else:
             raise ValueError(c)
     return schema

@@ -14,10 +14,6 @@ altair==5.4.0
     # via genspn
 anyio==4.4.0
     # via starlette
-astropy==7.0.0
-    # via genspn
-astropy-iers-data==0.2024.12.23.0.33.24
-    # via astropy
 asttokens==2.4.1
     # via stack-data
 attrs==24.2.0
@@ -102,6 +98,8 @@ jeepney==0.8.0
     # via secretstorage
 jinja2==3.1.4
     # via altair
+joblib==1.4.2
+    # via genspn
 jsonschema==4.23.0
     # via altair
 jsonschema-specifications==2023.12.1
@@ -140,13 +138,11 @@ narwhals==1.5.2
 nest-asyncio==1.6.0
     # via ipykernel
 numpy==2.1.0
-    # via astropy
     # via jax
     # via jaxlib
     # via ml-dtypes
     # via opt-einsum
     # via pyarrow
-    # via pyerfa
     # via scipy
 nvidia-cublas-cu12==12.6.0.22
     # via jax-cuda12-plugin
@@ -178,7 +174,6 @@ opt-einsum==3.3.0
     # via jax
 packaging==24.1
     # via altair
-    # via astropy
     # via huggingface-hub
     # via ipykernel
     # via marimo
@@ -214,8 +209,6 @@ pyasn1-modules==0.4.0
     # via google-auth
 pycparser==2.22
     # via cffi
-pyerfa==2.0.1.5
-    # via astropy
 pygments==2.18.0
     # via ipython
     # via marimo
@@ -227,7 +220,6 @@ pytest==8.3.4
 python-dateutil==2.9.0.post0
     # via jupyter-client
 pyyaml==6.0.2
-    # via astropy
     # via huggingface-hub
     # via marimo
     # via pymdown-extensions

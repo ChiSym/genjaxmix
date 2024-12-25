@@ -4,7 +4,8 @@ import numpy as np
 from plum import dispatch
 from jaxtyping import Array, Integer
 from genspn.distributions import (Dirichlet, MixtureModel,
-    posterior, sample, logpdf, Normal, Categorical, Mixed, Cluster, Trace)
+    posterior, sample, logpdf, Normal, Categorical, Mixed, Cluster,
+    Trace, DirichletPiecewiseUniform, PiecewiseUniform)
 from functools import partial
 
 @partial(jax.jit, static_argnames=['gibbs_iters', 'max_clusters', 'n_steps'])
@@ -145,6 +146,12 @@ def update_f(f0: Normal, f: Normal, k: Integer[Array, ""], K: Integer[Array, ""]
     std = update_vector(f0.std, f.std, k, K, max_clusters)
 
     return Normal(mu, std)
+
+@dispatch
+def update_f(f0: PiecewiseUniform, f: PiecewiseUniform, k: Integer[Array, ""], K: Integer[Array, ""], max_clusters: Integer[Array, ""]):
+    logweights = update_vector(f0.logweights, f.logweights, k, K, max_clusters)
+
+    return PiecewiseUniform(breaks=f0.breaks, logweights=logweights)
 
 @dispatch
 def update_f(f0: Categorical, f: Categorical, k: Integer[Array, ""], K: Integer[Array, ""], max_clusters: Integer[Array, ""]):
