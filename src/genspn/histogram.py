@@ -23,6 +23,12 @@ def histogram(data: Float[Array, "n"], max_bins: int = 100):
     break_idxs, _ = jax.lax.scan(f=step_histogram, init=break_idxs, length=max_bins - 1)
     breaks = jnp.take(data, break_idxs, indices_are_sorted=True)
 
+    # break_costs, new_breaks, new_break_idxs = jax.vmap(break_cost, in_axes=(None, None, 0, 0))(
+    #     breaks, break_idxs, data[1:], jnp.arange(1, len(data)))
+    # best_break_idx = jnp.nanargmax(break_costs)
+
+    # jax.debug.breakpoint()
+
     return breaks, break_idxs
 
 
@@ -35,8 +41,10 @@ def break_cost(breaks: Float[Array, "n"], break_idxs: Integer[Array, "n"],
 
     N = jnp.diff(new_break_idxs)
     T = jnp.diff(new_breaks)
+    mask = jnp.where(T == 0., jnp.nan, 1)
     N = N.at[0].set(N[0] + 1)
 
     bin_costs = N * (jnp.log(N) - jnp.log(T))
+    bin_costs = bin_costs * mask
 
     return jnp.nansum(bin_costs), new_breaks, new_break_idxs

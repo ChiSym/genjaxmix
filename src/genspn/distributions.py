@@ -335,7 +335,7 @@ def make_g(schema: dict):
 def make_piecewise_uniform_g(schema: dict):
     # here, we are assuming that all variables have the same number of breaks
     variables = schema["types"]["piecewise_uniform"]
-    breaks = jnp.vstack([schema["var_metadata"][v]["breaks"] for v in variables])
+    breaks = jnp.vstack([jnp.array(schema["var_metadata"][v]["breaks"]) for v in variables])
 
     # min_val = np.min([np.min(b) for b in breaks]) - 1
 

@@ -138,7 +138,7 @@ def split_data(data: Float[Array, "n n_c"] | Integer[Array, "n n_d"], test_ratio
 
     return train_data, test_data
 
-@memory.cache
+# @memory.cache
 def get_breaks(arr: Float[Array, "n"]):
     # return bayesian_blocks(arr, fitness='events')
     breaks, _ = histogram(arr, max_bins=20)
@@ -153,6 +153,7 @@ def make_schema(df: pl.DataFrame):
         },
         "var_metadata":{}
     }
+    key = jax.random.PRNGKey(1234)
     for c in df.columns:
         if df[c].dtype == pl.Utf8:
             schema["types"]["categorical"].append(c)
@@ -161,6 +162,8 @@ def make_schema(df: pl.DataFrame):
             schema["types"]["piecewise_uniform"].append(c)
             breaks = get_breaks(df[c].drop_nulls().to_numpy())
             schema["var_metadata"][c] = {"breaks": breaks}
+            if jnp.diff(breaks).min() == 0.:
+                import ipdb; ipdb.set_trace()
         else:
             raise ValueError(c)
     return schema
