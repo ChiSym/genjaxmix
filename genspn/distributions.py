@@ -89,6 +89,9 @@ class MixtureModel(eqx.Module):
     pi: Float[Array, "*batch k"]
     f: F
 
+    def __getitem__(self, key):
+        return MixtureModel(self.pi[key], self.f[key])
+
 @dispatch
 def sample(key: Array, dist: Dirichlet) -> Categorical:
     probs = jax.random.dirichlet(key, dist.alpha)
