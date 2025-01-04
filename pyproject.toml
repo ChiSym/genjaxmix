@@ -1,45 +1,27 @@
 [project]
-name = "genspn"
+name = "genjaxmix"
 version = "0.1.0"
-description = "Add your description here"
-authors = [
-    { name = "Joao Loula", email = "jloula@mit.edu" }
-]
-dependencies = [
-    "keyrings-google-artifactregistry-auth>=1.1.2",
-    "equinox>=0.11.4",
-    "jaxtyping>=0.2.29",
-    "pytest>=8.3.4",
-    "plum-dispatch>=2.4.1",
-    "jaxlib[cuda12_pip]>=0.4.29",
-    "ipdb>=0.13.13",
-    "jax[cuda12]>=0.4.29",
-    "marimo>=0.6.19",
-    "altair>=5.3.0",
-    "polars>=0.20.31",
-    "pyarrow>=16.1.0",
-    "ipykernel>=6.29.5",
-    "huggingface-hub>=0.24.6",
-    "safetensors>=0.4.5",
-    "joblib>=1.4.2",
-]
+description = "dpmm in genjax"
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">=3.12.5"
+dependencies = [
+    "altair>=5.5.0",
+    "equinox>=0.11.11",
+    "huggingface-hub>=0.26.2",
+    "ipdb>=0.13.13",
+    "ipykernel>=6.29.5",
+    "joblib>=1.4.2",
+    "keyring>=25.5.0",
+    "keyrings-google-artifactregistry-auth>=1.1.2",
+    "matplotlib>=3.9.2",
+    "plum-dispatch>=2.5.4",
+    "polars>=1.15.0",
+    "pyarrow>=18.1.0",
+    "pygments>=2.18.0",
+    "pytest>=8.3.3",
+    "safetensors>=0.5.0",
+]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.rye]
-managed = true
-dev-dependencies = []
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/genspn"]
-
-[[sources]]
-name = "gcp"
-url = "https://us-west1-python.pkg.dev/probcomp-caliban/probcomp/simple/"
+[[tool.uv.index]]
+name="gcp"
+url="https://us-west1-python.pkg.dev/probcomp-caliban/probcomp/simple/"

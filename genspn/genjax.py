@@ -1,4 +1,6 @@
 from genjax import gen, categorical, uniform, normal
+from genjax import ChoiceMapBuilder
+from functools import reduce
 import polars as pl
 import jax
 import numpy as np
@@ -74,3 +76,21 @@ def trace_to_polars(tr, schema):
             dfs.append(df)
 
     return pl.concat(dfs, how="horizontal")
+
+def make_chm(constraints, schema):
+    chm_list = []
+    for k, v in constraints.items():
+        k_type = [schema["types"][k_type] for k_type in schema["types"] if k in schema["types"][k_type]][0]
+        k_idx = schema["types"][k_type].index(k)
+        match k_type:
+            case "categorical":
+                level_idx = schema["var_metadata"][k]["levels"].index(v)
+                chm = ChoiceMapBuilder["categorical", k_idx].set(level_idx)
+            case "normal":
+                chm = ChoiceMapBuilder["normal", k_idx].set(v)
+            case "piecewise_uniform":
+                chm = ChoiceMapBuilder["piecewise_uniform", "val", k_idx].set(v)
+            case _:
+                raise ValueError(f"Unknown variable type: {k_type}")
+        chm_list.append(chm)
+    return reduce(lambda x, y: x ^ y, chm_list)

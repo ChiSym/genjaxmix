@@ -74,11 +74,14 @@ def get_dtype(n_categories):
 
 def load_huggingface(dataset_path):
     splits = {
-        "train": f"{dataset_path}/data-train-num.parquet",
+        "train": f"{dataset_path}/data-train-num-missing.parquet",
         "test": f"{dataset_path}/data-test-full-num.parquet"
     }
-    train_df = pl.read_parquet(f"hf://datasets/Large-Population-Model/model-building-evaluation/{splits['train']}")
-    test_df = pl.read_parquet(f"hf://datasets/Large-Population-Model/model-building-evaluation/{splits['test']}")
+    # train_df = pl.read_parquet(f"hf://datasets/Large-Population-Model/model-building-evaluation/{splits['train']}")
+    # test_df = pl.read_parquet(f"hf://datasets/Large-Population-Model/model-building-evaluation/{splits['test']}")
+
+    train_df = pl.read_parquet(f"../model-building-evaluation/{splits['train']}")
+    test_df = pl.read_parquet(f"../model-building-evaluation/{splits['test']}")
 
     df = pl.concat((train_df, test_df))
     schema, (numerical_array, categorical_array) = dataframe_to_arrays(df)

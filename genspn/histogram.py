@@ -12,6 +12,7 @@ def histogram(data: Float[Array, "n"], max_bins: int = 100):
     break_idxs = (len(data) - 1) * jnp.ones(max_bins + 1, dtype=jnp.int32)
     break_idxs = break_idxs.at[0].set(0)
 
+
     def step_histogram(break_idxs: Integer[Array, "max_bins"], x):
         breaks = jnp.take(data, break_idxs, indices_are_sorted=True)
         break_costs, new_breaks, new_break_idxs = jax.vmap(break_cost, in_axes=(None, None, 0, 0))(
