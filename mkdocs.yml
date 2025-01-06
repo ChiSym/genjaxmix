@@ -13,12 +13,19 @@ theme:
 plugins:
   - mkdocs-jupyter:
       execute: true
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+
 
 nav: 
   - Home: index.md
   - Tutorials: 
-    - Getting Started: tutorials/getting_started.md
-    - Analyzing Heart Diesease Patients: tutorials/heart_disease.md
-    - Test: tutorials/test.py
-  - Library Reference: api.md
+    - Getting Started: tutorials/test.py
+  - Library Reference: 
+    - API: reference/api.md
+    - Conjugacy: reference/conjugacy.md
+    - Inference: reference/inference.md
   - For Developers: dev.md

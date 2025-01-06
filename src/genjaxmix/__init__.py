@@ -1,5 +1,11 @@
-from .dpmm import generate
+"""Run Dirichlet Process Mixture Model inference using GenJAX.
 
-__all__ = [
-    "generate"
-]
+Modules exported by this package:
+
+- `dpmm`
+"""
+# from .dpmm import generate
+
+# __all__ = [
+#     "generate"
+# ]

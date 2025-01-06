@@ -12,3 +12,6 @@ wheels/
 jax_cache/
 
 .DS_Store
+
+site/
+slides/
