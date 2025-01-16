@@ -23,7 +23,9 @@ plugins:
 nav: 
   - Home: index.md
   - Tutorials: 
-    - Getting Started: tutorials/test.py
+    - Getting Started: tutorials/getting_started.py
+    - DPMMs from the Ground Up: tutorials/dpmm_ground_up.ipynb
+    - Splitting Clusters: tutorials/sub_cluster.ipynb
   - Library Reference: 
     - API: reference/api.md
     - Conjugacy: reference/conjugacy.md
