@@ -3,16 +3,26 @@ import jax
 import numpy as np
 from plum import dispatch
 from jaxtyping import Array, Integer
-from genspn.distributions import (Dirichlet, MixtureModel,
+from genjaxmix.distributions import (Dirichlet, MixtureModel,
     posterior, sample, logpdf, Normal, Categorical, Mixed, Cluster, Trace)
 from functools import partial
 
 @partial(jax.jit, static_argnames=['gibbs_iters', 'max_clusters', 'n_steps'])
-def smc(key, trace, data_test, n_steps, data, gibbs_iters, max_clusters):
+def smc(key:jax.random.PRNGKey, trace:Trace, data_test: jax.Array, n_steps:int, data:jax.Array, gibbs_iters:int, max_clusters:int):
+    """Runs a sequential Monte Carlo algorithm for a DPMM.
 
-    if not isinstance(data, tuple):
-        data = (data,)
-        data_test = (data_test,)
+    Args:
+        key: a PRNG key
+        trace: the initial trace
+        data_test: the test data
+        n_steps: the number of steps
+        data: the data
+        gibbs_iters: the number of Gibbs iterations
+        max_clusters: the maximum number of clusters
+    
+    Returns:
+        A tuple of the final trace and the sum of the log probabilities
+    """
     smc_keys = jax.random.split(key, n_steps)
 
     def wrap_step(trace, n):
@@ -46,7 +56,16 @@ def smc(key, trace, data_test, n_steps, data, gibbs_iters, max_clusters):
 
 
 
-def rejuvenate(key, data, trace, gibbs_iters, max_clusters):
+def rejuvenate(key:jax.random.PRNGKey, data:jax.Array, trace:Trace, gibbs_iters:int, max_clusters:int):
+    """Rejuvenate the trace by running rejuvenation moves for the cluster parameters, cluster proportions, and data point assignments.
+
+    Args:
+        key: a PRNG key
+        data: the data
+        trace: the trace
+        gibbs_iters: the number of Gibbs iterations
+        max_clusters: the maximum number of clusters
+    """
     extended_pi = jnp.concatenate((trace.cluster.pi, jnp.zeros(max_clusters)))
     log_likelihood_mask = jnp.where(extended_pi == 0, -jnp.inf, 0)
 
@@ -93,6 +112,16 @@ def get_weights(trace, K, data, q_split_trace, max_clusters):
     logpdf_split_clusters = score_trace_cluster(data, trace.g, q_split_trace[-1], max_clusters, add_c=True)
 
     return logpdf_pi + logpdf_split_clusters - logpdf_clusters
+
+def score_q_pi(q_pi, max_clusters, alpha):
+    q_pi_dist = Dirichlet(alpha=jnp.ones((1, 2)) * alpha/2)
+    q_pi_stack = Categorical(
+        jnp.vstack((
+        jnp.log(q_pi[:max_clusters]),
+        jnp.log(q_pi[max_clusters:]),
+     ))[None, :])
+
+    return jax.vmap(logpdf, in_axes=(None, -1))(q_pi_dist, q_pi_stack)
 
 def make_pi(pi, k, pi_split, max_clusters):
     pi_k0 = pi[k]
@@ -153,11 +182,10 @@ def update_f(f0: Categorical, f: Categorical, k: Integer[Array, ""], K: Integer[
     return Categorical(logprobs)
 
 @dispatch
-# plum is struggling with this signature for some reason, momentarily using a catch all
-# def update_f(f0: Mixed, f: Mixed, k: Integer[Array, ""], K: Integer[Array, ""], max_clusters: Integer[Array, ""]):
-def update_f(f0: Mixed, f, k, K, max_clusters):
+def update_f(f0: Mixed, f: Mixed, k: Integer[Array, ""], K: Integer[Array, ""], max_clusters: Integer[Array, ""]):
     return Mixed(
-        dists=tuple([update_f(f0.dists[i], f.dists[i], k, K, max_clusters) for i in range(len(f0.dists))])
+        update_f(f0.normal, f.normal, k, K, max_clusters),
+        update_f(f0.categorical, f.categorical, k, K, max_clusters)
     )
 
 def update_vector(v0, split_v, k, K, max_clusters):
@@ -202,12 +230,30 @@ def gibbs_step(assignments, key, alpha, g, data, log_likelihood_mask, max_cluste
     # now compute the logpdf for the assignments given the new distribution
     return assignments, Cluster(assignments, pi, f)
 
-def gibbs_f(max_clusters, data, key, g, assignments):
+def gibbs_f(max_clusters:int, data:jax.Array, key:jax.random.PRNGKey, g, assignments:jax.Array):
+    """Gibbs move for the cluster parameters.
+
+    Args:
+        max_clusters: the maximum number of clusters
+        data: the data
+        key: a PRNG key
+        g: the prior distribution
+        assignments: the data point assignments
+    """
     g_prime = posterior(g, data, assignments, 2*max_clusters)
     f = sample(key, g_prime)
     return f
 
-def gibbs_c(key, pi, log_likelihood_mask, f, data):
+def gibbs_c(key:jax.random.PRNGKey, pi:jax.Array, log_likelihood_mask:jax.Array, f, data:jax.Array):
+    """Gibbs move for the data point assignments.
+
+    Args:
+        key: a PRNG key
+        pi: the cluster proportions
+        log_likelihood_mask: a mask for the log likelihoods
+        f: the cluster parameters
+        data: the data
+    """
     log_likelihoods = jax.vmap(jax.vmap(logpdf, in_axes=(0, None)), in_axes=(None, 0))(f, data)
     log_likelihoods = log_likelihoods + log_likelihood_mask
     log_score = log_likelihoods + jnp.log(pi)
@@ -215,7 +261,16 @@ def gibbs_c(key, pi, log_likelihood_mask, f, data):
     assignments = jax.random.categorical(key, log_score, axis=-1).astype(int)
     return assignments
 
-def gibbs_pi(max_clusters, key, alpha, c, rejuvenation=False):
+def gibbs_pi(max_clusters:int, key:jax.random.PRNGKey, alpha:float, c:jax.Array, rejuvenation:bool=False):
+    """Gibbs move for the cluster proportions.
+
+    Args:
+        max_clusters: the maximum number of clusters
+        key: a PRNG key
+        alpha: the Dirichlet hyperparameter
+        c: the data point assignments
+        rejuvenation: whether to rejuvenate the cluster proportions
+    """
     cluster_counts = jnp.sum(jax.nn.one_hot(c, num_classes=2 * max_clusters, dtype=jnp.int32), axis=0)
     if rejuvenation:
         pi = jax.random.dirichlet(key, cluster_counts)
