@@ -1,0 +1,494 @@
+---
+title: "GenJAXMix: Accelerating Cluster Modeling with GenJAX "
+author: 
+  - "Ian Limarta"
+format: 
+  revealjs:
+    chalkboard: 
+        buttons: false
+    css: styles.css
+execute:
+  echo: true
+---
+
+## Outline
+i. JAXCat: Cluster modeling using non-parametric inference
+
+ii. The Dirichlet Process Mixture Modeling in GenJAX
+
+iii. Scaling Inference in GenJAX
+
+iv. Accuracy Preview, Release, Next Steps
+
+# I. JAXCat: Cluster Modeling Using Non-Parametric Inference
+
+## Do these clusters look correct?
+![](pre_cluster.png){fig-align="center" width=400}
+
+## Do these clusters look correct?
+![](post_cluster.png){fig-align="center" width=400}
+
+
+## What is JAXCat? {.smaller}
+
+- Analyze heterogenous, high-dimensional data by adaptive clustering.
+
+- Use **Dirichlet Process Mixture Models** (DPMMs) as the inference backbone for flexible hypothesis.
+
+- Accelerate with JAX, GPUs, and **Sequential Monte Carlo** (SMC) for large datasets.
+
+Example datasets ([Large-Population-Model at HuggingFace](https://huggingface.co/datasets/Large-Population-Model/model-building-evaluation))
+
+| Dataset | Features | Rows |
+|------------|------------|------------|
+| Cleveland Heart Disease Dataset | 5 numerical (e.g. heart rate) and 9 nominal (e.g. chest pain) | 546 |
+| Wisconsin Breast Cancer Dataset | All nominal features (e.g. adhesion) | 1.26k |
+| Harmonized Census Data | 5 numerical + 23 nominal (e.g. employment status) | 1.6 M |
+
+
+## Previous Modeling Implementations*  {.smaller}
+
+:::: {.columns}
+::: {.column width="40%"}
+**C++/Python**
+
+**C++/Python**
+
+**Venture**
+
+**Python 2**
+
+**Python 2**
+
+**Python 2**
+
+**Python 3**
+
+**Haskell**
+
+**Clojure**
+
+**Metaprob**
+
+**JAX**
+
+**JAX**
+:::
+
+::: {.column width="60%"}
+[probcomp/crosscat](https://github.com/probcomp/crosscat){style="color: #0097A7;"}
+
+[posterior/loom](https://github.com/posterior/loom){style="color: #0097A7;"}
+
+[probcomp/Venturecxx](https://github.com/probcomp/Venturecxx/blob/master/examples/crosscat.vnt){style="color: #0097A7;"}
+
+[probcomp/bayeslite](https://github.com/probcomp/bayeslite){style="color: #0097A7;"} and [probcomp/BayesDB](http://probcomp.csail.mit.edu/bayesdb){style="color: #0097A7;"}
+
+
+[probcomp/panelcat](https://github.com/probcomp/panelcat){style="color: #0097A7;"} and [Feras Saad's Thesis](https://www.cs.cmu.edu/~fsaad/assets/Saad-fsaad-PhD-EECS-2022-thesis.pdf){style="color: #0097A7;"}
+
+[probcomp/cgpm](https://github.com/probcomp/cgpm){style="color: #0097A7;"}
+
+[SPPL (via CGPM to SPN conversion)](https://github.com/probcomp/sum-product-cgpm){style="color: #0097A7;"}
+
+[probcomp/haxcat](https://github.com/probcomp/haxcat){style="color: #0097A7;"}
+
+[ClojureCat](https://github.com/OpenGen/GenSQL.inference){style="color: #0097A7;"} and [Nick Charchut's Thesis](https://dspace.mit.edu/handle/1721.1/129078){style="color: #0097A7;"}
+
+[BayesDB to Metaprob](https://github.com/probcomp/crosscat-to-metaprob){style="color: #0097A7;"}
+
+[DPPM (MCMC)](https://github.com/probcomp/jaxcat){style="color: #0097A7;"}
+
+[DPPM (SMC)](https://github.com/OpenGen/genjaxmix/tree/pure-jax/src/genspn){style="color: #0097A7;"}
+:::
+::::
+
+\* CrossCat is a domain-general data that broadens the types of models in this talk.
+
+## Why GenJAXMix?
+
+- João's JAXCat provides great parallelism on the GPU, but it is written in pure JAX.
+- We wish to make non-parametric modeling *Genial*: generative models and inference algorithms are written using GenJAX semantics. 
+
+![](genjax%20logo.png){fig-align="center" height=150}
+
+::: footer
+Learn more: [GenJAX Homepage](https://genjax.gen.de)
+:::
+
+
+# II. Dirichlet Process Mixture Modeling in GenJAX
+
+## DPMMs and Clustering
+- The **Dirichlet process mixture model** (DPMM) is the backbone of non-parametric clustering techhniques. 
+- DPMMs adapt to an *unknown* number of clusters. 
+- Can be viewed as a mixture model with an *infinite* number of clusters.
+- DPMMs can be seen as the simplest instance of  CrossCat (where there is only one *view*).
+
+
+## Dirichlet Process in Action
+![](dpmm/dpmm_empty.svg){fig-align="center"}
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad\text{(cluster probabilities)}\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\text{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\text{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\text{observations})
+\end{align*}
+$$
+:::
+
+## Dirichlet Process in Action
+![](dpmm/dpmm_0.svg){fig-align="center"}
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad(\textbf{cluster probabilities})\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\text{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\text{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\text{observations})
+\end{align*}
+$$
+:::
+
+## Dirichlet Process in Action
+![](dpmm/dpmm_1.svg){fig-align="center"}
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad(\textbf{cluster probabilities})\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\text{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\text{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\text{observations})
+\end{align*}
+$$
+:::
+
+## Dirichlet Process in Action
+![](dpmm/dpmm_2.svg){fig-align="center"}
+
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad(\text{cluster probabilities})\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\textbf{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\text{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\text{observations})
+\end{align*}
+$$
+:::
+
+## Dirichlet Process in Action
+![](dpmm/dpmm_3_a.svg){fig-align="center"}
+
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad\text{(cluster probabilities)}\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\text{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\textbf{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\text{observations})
+\end{align*}
+$$
+:::
+
+## Dirichlet Process in Action
+![](dpmm/dpmm_3_b.svg){fig-align="center"}
+
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad\text{(cluster probabilities)}\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\text{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\text{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\textbf{observations})
+\end{align*}
+$$
+:::
+
+## Dirichlet Process in Action
+![](dpmm/dpmm_3_c.svg){fig-align="center"}
+
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad\text{(cluster probabilities)}\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\text{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\text{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\text{observations})
+\end{align*}
+$$
+:::
+
+## Dirichlet Process in Action
+![](dpmm/dpmm.gif){fig-align="center"}
+
+
+::: {style="font-size: 50%"}
+$$
+\begin{align*}
+    \pi_1,\pi_2,\ldots &\sim \text{GEM}(\alpha)&\quad\text{(cluster probabilities)}\\
+    \theta_k &\sim G, \quad k = 1,2, \dots &(\text{hyperparameters. mean, standard deviation}) \\
+    c_i|\pi&\sim \text{Cat}(\pi),\quad i=1,\ldots, N&(\text{assignments})\\
+    y_i|c_i,\theta &\sim p(x \mid \theta_{c_i}), \quad i = 1, \dots, N& (\text{observations})
+\end{align*}
+$$
+:::
+
+
+## GenJAX Model of DPMM {.smaller}
+
+<!-- {code-line-numbers="|1-7|8-13|13-17|19-24|"}  -->
+```python{code-line-numbers="|1-6|8-13|15-20|22-27|" .out}
+# sample proportions π ~ GEM(alpha)
+@gen 
+def gem(alpha): 
+    betas = genjax.beta(alpha*jnp.ones(N_max), jnp.ones(N_max)) @ "beta"
+    logpi = beta_to_logpi(betas) # stick breaking process
+    return logpi
+
+# sample cluster centers and std
+@gen 
+def hyperparameters(): 
+    sigma = genjax.inverse_gamma(jnp.ones((N_max, F_numerical)), jnp.ones((N_max, F_numerical))) @ "sigma"
+    mu = genjax.normal(jnp.zeros((N_max, F_numerical)), sigma) @ "mu"
+    return mu, sigma
+
+# sample assignment c_i then sample observation y
+@gen
+def cluster(pi, mu, sigma):
+    idx = genjax.categorical(pi) @ "c"
+    y = genjax.normal(mu[idx], sigma[idx]) @ "y"
+    return idx, x
+
+@gen
+def dpmm(alpha):
+    logpi = gem(alpha) @ "pi"
+    mu, sigma = hyperparameters() @ "hyperparameters"
+    y = cluster_repeat(logpi, mu, sigma) @ "assignments"
+    return y
+```
+
+
+
+# III. Scaling Inference in GenJAX
+
+## Inferring Clusters
+- *Given*: The tabular data as observations $y_{1:N}$ 
+- *Goal*: Approximate the distribution
+
+ $$\pi, \theta, c_{1:N}|y_{1:N}$$ 
+
+::: {.callout-tip .fragment}
+## Example
+With our 2D Gaussians, the hyperparameters $\theta$ are the means, $\mu$, and standard deviations, $\sigma$, of the clusters. We are given as observations points $(x,y)$.
+:::
+
+::: {.fragment}
+- In GenJAX, we can write *custom* proposals to target this posterior in a series of stages.
+:::
+
+
+## Inference Moves{.smaller}
+a) Improvements to cluster proportions, $\pi$.
+b) Improvements to cluster hyperparameters, $\theta=(\mu,\sigma)$.
+c) Improvements to data point assignments, $c$.
+
+<!-- - DPMM inference historically considered slow since it requires *all* the data upfront and updates occur in a *serial* manner.  -->
+
+::: {.callout-important .fragment}
+## Question
+Which parts are hard to to parallelize using traditional MCMC? Which step requires all data upfront?
+:::
+
+<!-- ::: {.callout-tip .fragment}
+## Answer
+Inferences concerning $c$.
+
+1. Traditional algorithms refine $c$ *one* data point at a time.
+2. Moreover MCMC usually requires *all* the data up front to update $c$. -->
+
+## Inference Moves{.smaller}
+1. Improvements to cluster proportions, $\pi$. ✅
+2. Improvements to cluster hyperparameters, $\theta=(\mu,\sigma)$. ✅
+3. Improvements to data point assignments, $c$. ❌
+
+<!-- - DPMM inference historically considered slow since it requires *all* the data upfront and updates occur in a *serial* manner.  -->
+
+::: {.callout-important }
+## Question
+Which parts are hard to to parallelize using traditional MCMC? Which step requires all data upfront?
+:::
+
+::: {.callout-tip }
+## Answer
+- $(1)$ and $(2)$ are simple in JAX to parallelize. 
+- $(3)$ is trickier with traditional algorithms. Less GPU friendly.
+:::
+
+## "Easier" GenJAX Inference Update {.smaller}
+
+Inferences for $(1)$ and $(2)$ aren't so bad. Here is the proposal for $(2)$:
+
+::: {.fragment}
+```python{code-line-numbers="|3-4|12-17"}
+def rejuvenate_parameters(obs):
+    # Given
+    c = obs[:, "c"]  # current cluster assignments
+    y1 = obs[:, "y1"] # data observations
+
+    mu_0, v_0, a, b = jax.vmap(posterior_normal_inverse_gamma, in_axes=(None, 1))(c, y1)
+    mu_0 = mu_0.T
+    v_0 = v_0.T
+    a = a.T
+    b = b.T
+
+    # Propose sigmas (σ_1,σ_2)
+    sigma_sq = inverse_gamma(a,b) @ "sigma"
+    sigma = jnp.sqrt(sigma_sq)
+
+    # Propose means (μ_1, μ_2)
+    mu = normal(mu_0, sigma * v_0 ) @ "mu"
+
+    return mu, sigma
+```
+:::
+
+
+## Parallelization Idea for $(3)$: Updating Membership $c${.smaller}
+
+- Start with one "super cluster" and slowly split it into smaller ones in a data-driven process. This idea is known as a split-merge move.
+- Searching and scoring good cluster splits can be done in parallel!
+
+![](split/split_0.svg){fig-align="center" width=600}
+
+## Parallelization Idea for $(3)$: Updating Membership $c${.smaller}
+
+- Start with one "super cluster" and slowly split it into smaller ones in a data-driven process. This idea is known as a split-merge move.
+- Searching and scoring good cluster splits can be done in parallel!
+
+![](split/split_1.svg){fig-align="center" width=600}
+
+## Parallelization Idea for $(3)$: Updating Membership $c${.smaller}
+
+- Start with one "super cluster" and slowly split it into smaller ones in a data-driven process. This idea is known as a split-merge move.
+- Searching and scoring good cluster splits can be done in parallel!
+
+![](split/split_2.svg){fig-align="center" width=600}
+
+## Parallelization Idea for $(3)$: Updating Membership $c${.smaller}
+
+- Start with one "super cluster" and slowly split it into smaller ones in a data-driven process. This idea is known as a split-merge move.
+- Searching and scoring good cluster splits can be done in parallel!
+
+![](split/split_3.svg){fig-align="center" width=600}
+
+
+## Transforming MCMC To SMC{.smaller}
+
+::: {.fragment}
+- *Parallel sampling of DP mixture models
+using sub-cluster splits* (Chang, Fisher)
+- *ClusterCluster: Parallel Markov Chain Monte Carlo for Dirichlet Process Mixtures* (Lovell, Malmaud, Adams, Mansinghka)
+- *CPU- and GPU-based Distributed Sampling in Dirichlet Process Mixtures for Large-scale Analysis* (Dinari, Zamir, Fisher, Freifeld)
+:::
+
+::: {.callout-important .fragment}
+## Question
+How does SMC come into the picture? 
+:::
+
+::: {.callout-tip .fragment}
+## Answer
+Proposing which cluster to split next is intuitively an SMC update.
+:::
+
+::: {.fragment}
+Example: Start with $c_1=c_2=\ldots, c_N=1$ and $\pi_1=1$. 
+
+We can split $\pi_1$ into two components (i.e. by using a Dirichlet prior) and assign each data point from the super cluster to one of the two components. The quality of the split is determine by the weight of the particle.
+:::
+
+
+## Splitting a Cluster in GenJAX
+With these two ideas, we can write a proposal to split clusters:
+
+```python
+@gen
+def split_proposal():
+```
+
+## How to Use GenJAXMix?
+High-level wrapper:
+
+```{.python}
+"""
+Modeling 2D Gaussians
+"""
+import genjaxmix
+
+N_max = 10000 # number of samples
+num_numerical = 2 
+num_nominal = 0
+
+# genjax model
+model = dpmm.init(alpha=1.0, num_numerical num_nominal, N_max)
+```
+
+
+<!-- ## Benchmarks  -->
+
+<!-- On 10k points for 2D Gaussian
+
+| Implementation | Timing | LoC (Model + Inference) |
+|------------|------------|----------|
+| Julia (CPU) | ? | ~150+300 |
+| Julia (Metal) | ? | ~150+300 |
+| JAX | ? | ~150+300 |
+| GenJAX (Metal)* | ? | ~25+400 | -->
+
+# IV. Accuracy Preview, Release, Next Steps
+
+## Sneak Peak into João + Ulli's Work{.smaller}
+- On real data, JAXCat often has higher log-likelihood.
+![Repo](./jaxcat.png)
+- Loom: C++ implementation of CrossCat
+- Adversarial Random Forest (ARF): Baseline comparison
+
+## Access to GenJAXMix {.smaller}
+
+![](./repo.png)
+
+- Repo and docs: [OpenGen/genjaxmix](https://github.com/OpenGen/genjaxmix){style="color:#0097A7;"}
+
+- Pure JAX implementation: [OpenGen/genjaxmix/tree/pure-jax/src/genspn](https://github.com/OpenGen/genjaxmix/tree/pure-jax/src/genspn){style="color:#0097A7;"}
+
+
+
+## Road Ahead
+
+- Prelease by end of year.
+  - Polish API
+  - Get feedback from users
+
+- Towards a future 1.0:
+  - Docs website
+  - Writing a tutorial
+  - Run SMC with N>1 particles
+  - Clean hacks in generative functions
+  - CrossCat implementation and more expressive models
+
+## Thanks
+  - João Loula
+  - Ulli Schaechtle
+  - Cameron Freer
+  - Marjorie Freedman
+  - Timothy O’Donnell

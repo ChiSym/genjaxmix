@@ -441,8 +441,8 @@ wheels = [
 
 [[package]]
 name = "genjax"
-version = "0.7.0.post29.dev0+0ac904da"
-source = { git = "https://github.com/probcomp/genjax.git#0ac904dad887a3ac74c9342811fc571257e0e2d6" }
+version = "0.8.2.dev1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beartype" },
     { name = "deprecated" },
@@ -452,6 +452,10 @@ dependencies = [
     { name = "penzai" },
     { name = "tensorflow-probability" },
     { name = "treescope" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c8/10/81f7560971a4eec9294256b1107cbd7dcbbbf822ea44e681834a5d7135e1/genjax-0.8.2.dev1.tar.gz", hash = "sha256:034bd2da1be9254e4c1bf69f9b2a33588933d35f71138111a20806c85b67d448", size = 103368 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/26/633c35708727a1fb553132added3d105ccd3af6ad3106be13d3dcf7533c9/genjax-0.8.2.dev1-py3-none-any.whl", hash = "sha256:b197198253ba422aaa63bb72584e571c8471b2cdc157e8bb7fead0d9b2a8490a", size = 146549 },
 ]
 
 [[package]]
@@ -487,7 +491,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=5.5.0" },
-    { name = "genjax", git = "https://github.com/probcomp/genjax.git" },
+    { name = "genjax", specifier = ">=0.8.0" },
     { name = "huggingface-hub", specifier = ">=0.26.2" },
     { name = "ipdb", specifier = ">=0.13.13" },
     { name = "ipykernel", specifier = ">=6.29.5" },

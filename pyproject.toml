@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12.5"
 dependencies = [
     "altair>=5.5.0",
-    "genjax",
+    "genjax>=0.8.0",
     "huggingface-hub>=0.26.2",
     "ipdb>=0.13.13",
     "ipykernel>=6.29.5",
@@ -18,21 +18,4 @@ dependencies = [
     "pyarrow>=18.1.0",
     "pygments>=2.18.0",
     "pytest>=8.3.3",
-]
-
-[tool.uv.sources]
-genjax = { git = "https://github.com/probcomp/genjax.git" }
-
-[[tool.uv.index]]
-name="gcp"
-url="https://us-west1-python.pkg.dev/probcomp-caliban/probcomp/simple/"
-
-[dependency-groups]
-dev = [
-    "mkdocs-material>=9.5.48",
-    "mkdocs>=1.6.1",
-    "mkdocstrings>=0.27.0",
-    "mkdocstrings-python>=1.12.2",
-    "mkdocs-jupyter>=0.25.1",
-    "jupytext>=1.16.4",
 ]
