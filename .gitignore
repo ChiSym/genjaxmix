@@ -16,4 +16,6 @@ jax_cache/
 # builds
 site/
 .ruff_cache
+.vscode
+slides/
 
