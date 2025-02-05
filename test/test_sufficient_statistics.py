@@ -1,7 +1,6 @@
 import jax
 import jax.numpy as jnp
-
-import genjaxmix.conjugacy.sufficient_statistics as ss
+import genjaxmix.analytical.sufficient_statistics as ss
 
 
 def test_sss_nig_normal():

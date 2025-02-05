@@ -1,7 +1,7 @@
 from plum import dispatch
 import jax.numpy as jnp
 import jax
-import genjaxmix.distributions as dist
+import genjaxmix.core as dist
 from jaxtyping import Array, Float, Int
 
 
