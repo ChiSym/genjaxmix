@@ -1,4 +1,5 @@
 import jax
+import jax.numpy as jnp
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from jaxtyping import Float, Array, Int
@@ -6,19 +7,15 @@ from jaxtyping import Float, Array, Int
 
 @jax.tree_util.register_dataclass
 @dataclass
-class Latents:
-    pi: Float[Array, ""]  # noqa: F722
-    latent: Float[Array, ""]  # noqa: F722
-    assignments: Int[Array, ""]  # noqa: F722
-    K: int
+class Parameter:
+    data: Array
 
 
-@jax.tree_util.register_dataclass
-@dataclass
-class Hyperparameters:
-    alpha: Float
-    hyperparameters: tuple
-    K: int
+# @jax.tree_util.register_dataclass
+# @dataclass
+# class Hyperparameters:
+#     data: tuple
+#     K: int
 
 
 #################
@@ -28,27 +25,34 @@ class Hyperparameters:
 
 class Distribution(ABC):
     @abstractmethod
-    def sampler(self):
-        return self._sampler
+    def sample(self, key, *args):
+        pass
 
 
 class NormalInverseGamma(Distribution):
-    def _sampler(self, key, parameters):
-        mu_0, v_0, a_0, b_0 = parameters
+    def _sampler(self, key, *args):
+        mu_0, v_0, a_0, b_0 = args
+        shape = mu_0.shape
+        return (mu_0, v_0)
 
 
 class Normal(Distribution):
-    def _sampler(self, key, parameters, shape):
-        mu, sigma = parameters
-        return jax.random.normal(key, mu, sigma, shape=shape)
+    def sample(self, key, *args):
+        mu = args[0]
+        sigma_sq = args[1]
+        shape = mu.shape
+        noise = jax.random.normal(key, shape=shape)
+        return (noise * jnp.sqrt(sigma_sq) + mu,)
 
 
 class Dirichlet(Distribution):
-    pass
+    def sample(self, key, *args):
+        alphas = args[0]
 
 
 class Categorical(Distribution):
-    pass
+    def _sample(self, key):
+        pass
 
 
 class Beta(Distribution):
