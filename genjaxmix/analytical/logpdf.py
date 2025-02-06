@@ -9,6 +9,7 @@ import jax
 def logpdf(prior: core.Normal, likelihood: core.Normal):
     return _logpdf_normal_normal
 
+
 @dispatch
 def logpdf(prior: core.Gamma, likelihood: core.Normal):
     return _log_gamma_normal

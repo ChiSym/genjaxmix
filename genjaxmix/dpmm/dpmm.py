@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Key, Float
+from jaxtyping import Array, Key, Float, Int
 from genjaxmix.core import Distribution
 from genjaxmix.analytical import logpdf
 from genjaxmix.analytical.posterior import segmented_posterior_sampler
@@ -8,12 +8,12 @@ from genjaxmix.analytical.posterior import segmented_posterior_sampler
 
 def gibbs_pi(
     key: Key[Array, ""],  # noqa: F722
-    alpha: Float[Array, ""], # noqa: F722
-    pi: Float[Array, " k"], # noqa: F722
-    assignments: Float[Array, " n"] # noqa: F722
+    alpha: Float[Array, ""],  # noqa: F722
+    assignments: Float[Array, " n"],  # noqa: F722
+    pi: Float[Array, " k"],  # noqa: F722
+    K: Int[Array, ""],
 ):
-    K_max = pi.pi.shape[0]
-    K = pi.K
+    K_max = pi.shape[0]
     counts = jnp.bincount(assignments, length=K_max)
     alpha_new = jnp.where(jnp.arange(K_max) < K, counts, alpha)
     alpha_new = jnp.where(jnp.arange(K_max) < K + 1, alpha_new, 0.0)
