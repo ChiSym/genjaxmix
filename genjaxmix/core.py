@@ -44,6 +44,9 @@ class Normal(Distribution):
         noise = jax.random.normal(key, shape=shape)
         return (noise * jnp.sqrt(sigma_sq) + mu,)
 
+    def logpdf(self, *args):
+        pass
+
 
 class Dirichlet(Distribution):
     def sample(self, key, *args):
@@ -64,7 +67,8 @@ class Bernoulli(Distribution):
 
 
 class Gamma(Distribution):
-    pass
+    def sample(self, key, *args):
+        return
 
 
 class Poisson(Distribution):

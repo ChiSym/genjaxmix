@@ -58,6 +58,7 @@ def _sps_normal_normal(
     noise = jax.random.normal(key, shape=mu_0.shape)
     return noise * jnp.sqrt(sig_sq_post) + mu_post
 
+
 def _sps_gamma_normal(
     key,
     hyperparameters: core.Parameter,  # noqa: F722
@@ -89,5 +90,3 @@ def _sps_dirichlet_categorical(
 
     noise = jax.random.dirichlet(key, alpha_0)
     return noise + mu_post
-
-

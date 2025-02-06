@@ -1,22 +1,17 @@
 import jax
-from plum import dispatch
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Int, Key
-from genjaxmix.core import Parameter, Distribution
-from genjaxmix.analytical.marginal_likelihood import segmented_marginal_likelihood
-from genjaxmix.analytical import sufficient_statistics, marginal_likelihood
+from jaxtyping import Array, Key, Float
+from genjaxmix.core import Distribution
+from genjaxmix.analytical import logpdf
 from genjaxmix.analytical.posterior import segmented_posterior_sampler
 
 
 def gibbs_pi(
     key: Key[Array, ""],  # noqa: F722
-    hyperparameters: Parameter,  # noqa: F722
-    latents: Parameter,  # noqa: F722
+    alpha: Float[Array, ""], # noqa: F722
+    pi: Float[Array, " k"], # noqa: F722
+    assignments: Float[Array, " n"] # noqa: F722
 ):
-    alpha = hyperparameters.alpha
-    pi = latents.pi
-    assignments = latents.assignments
-
     K_max = pi.pi.shape[0]
     K = pi.K
     counts = jnp.bincount(assignments, length=K_max)
@@ -27,20 +22,27 @@ def gibbs_pi(
 
 
 def gibbs_z_proposal(prior: Distribution, likelihood: Distribution):
-    sml = segmented_marginal_likelihood(prior, likelihood)
+    """
+    Returns a function that samples the assignments given the hyperparameters, parameters, observations, and pi.
 
-    def _gibbs_z(key, hyperparameters, latents, observations):
-        pi = hyperparameters.pi
-        assignments = latents.assignments
-        weights = sml(hyperparameters, observations, assignments)
-        weights = weights + jnp.log(pi)
-        labels = jax.random.categorical(key, weights)
-        return labels
+    Args:
+        prior: The prior distribution.
+        likelihood: The likelihood distribution.
+    """
+    logpdf_lambda = logpdf.logpdf(prior, likelihood)
+
+    def _gibbs_z(key, hyperparameters, parameters, observations, pi, K):
+        log_pdfs = jax.vmap(logpdf_lambda, in_axes=(None, None, 0, None))(
+            hyperparameters, parameters, observations, K
+        )
+        log_pdfs = log_pdfs + jnp.log(pi)
+        z = jax.random.categorical(key, log_pdfs)
+        return z
 
     return _gibbs_z
 
 
-def gibbs_parameters_proposal(prior: Distribution, likelihood):
+def gibbs_parameters_proposal(prior: Distribution, likelihood: Distribution):
     """
     Returns a function that samples the parameters from the posterior given the hyperparameters, observations, and assignments.
 
