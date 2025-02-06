@@ -11,24 +11,24 @@ def segmented_posterior_sampler(prior: core.Normal, likelihood: core.Normal):
 
 @dispatch
 def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Normal):
-    pass
+    return _sps_gamma_normal
 
 
 @dispatch
 def segmented_posterior_sampler(prior: core.Dirichlet, likelihood: core.Categorical):
-    pass
+    return _sps_dirichlet_categorical
 
 
 @dispatch
 def segmented_posterior_sampler(
     prior: core.NormalInverseGamma, likelihood: core.Normal
 ):
-    pass
+    return _sps_nig_normal
 
 
 @dispatch
 def segmented_posterior_sampler(prior: core.Beta, likelihood: core.Bernoulli):
-    pass
+    return _sps_beta_bernoulli
 
 
 @dispatch
@@ -38,8 +38,7 @@ def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):
 
 @dispatch
 def segmented_posterior_sampler(prior: core.InverseGamma, likelihood: core.Normal):
-    pass
-
+    return _sps_inverse_gamma_normal
 
 #######
 def _sps_normal_normal(
@@ -65,15 +64,56 @@ def _sps_gamma_normal(
     x: core.Parameter,  # noqa: F722
     assignments: core.Parameter,  # noqa: F722
 ):
-    alpha_0, beta_0, mu_0, sig_sq_0, sig_sq = hyperparameters
-
+    alpha_0, beta_0, mu = hyperparameters
     counts = jnp.bincount(assignments, length=alpha_0.shape[0])
-    x_sum = jax.ops.segment_sum(x, assignments, alpha_0.shape[0])
-    sig_sq_post = 1 / (1 / sig_sq_0 + counts[:, None] / sig_sq)
-    mu_post = sig_sq_post * (mu_0 / sig_sq_0 + x_sum / sig_sq)
+    sum_squared_diff = jax.ops.segment_sum(
+        (x - mu[assignments]) ** 2, assignments, alpha_0.shape[0]
+    )
 
-    noise = jax.random.normal(key, shape=mu_0.shape)
-    return noise * jnp.sqrt(sig_sq_post) + mu_post
+    alpha_new = alpha_0 + 0.5 * counts
+    beta_new = beta_0 + 0.5 * sum_squared_diff
+    return jax.random.gamma(key, alpha_new, beta_new, shape=mu.shape)
+
+
+def _sps_inverse_gamma_normal(
+    key,
+    hyperparameters: core.Parameter,  # noqa: F722
+    x: core.Parameter,  # noqa: F722
+    assignments: core.Parameter,  # noqa: F722
+):
+    alpha_0, beta_0, mu = hyperparameters
+    counts = jnp.bincount(assignments, length=alpha_0.shape[0])
+    sum_squared_diff = jax.ops.segment_sum(
+        (x - mu[assignments]) ** 2, assignments, alpha_0.shape[0]
+    )
+
+    alpha_new = alpha_0 + 0.5 * counts
+    beta_new = beta_0 + 0.5 * sum_squared_diff
+    return 1/jax.random.gamma(key, alpha_new, beta_new, shape=mu.shape)
+
+
+def _sps_nig_normal(
+    key,
+    hyperparameters: core.Parameter,  # noqa: F722
+    x: core.Parameter,  # noqa: F722
+    assignments: core.Parameter,  # noqa: F722
+):
+    mu_0, v_0, alpha_0, beta_0 = hyperparameters
+    K_max = alpha_0.shape[0]
+
+    counts = jnp.bincount(assignments, length=K_max)
+    x_sum = jax.ops.segment_sum(x, assignments, K_max)
+    x_sum_sq = jax.ops.segment_sum(x**2, assignments, K_max)
+
+    v_post = 1 / (1 / v_0 + counts)
+    mu_post = 1 / (v_0) * mu_0 + x_sum
+
+    alpha_post = alpha_0 + counts / 2
+    beta_post = beta_0 + 0.5 * (x_sum_sq + mu_0**2 / v_0 - mu_post**2 / v_post)
+
+    sigma_new = jax.random.gamma(key, alpha_post, 1 / beta_post, shape=v_0.shape)
+    mu_new = jax.random.normal(key, mu_0.shape) * jnp.sqrt(sigma_new) + mu_post
+    return mu_new, sigma_new
 
 
 def _sps_dirichlet_categorical(
@@ -82,11 +122,21 @@ def _sps_dirichlet_categorical(
     x: core.Parameter,  # noqa: F722
     assignments: core.Parameter,  # noqa: F722
 ):
-    alpha_0, mu_0 = hyperparameters
+    alpha, segment_ids = hyperparameters
+    raise NotImplementedError()
+
+
+def _sps_beta_bernoulli(
+    key,
+    hyperparameters: core.Parameter,  # noqa: F722
+    x: core.Parameter,  # noqa: F722
+    assignments: core.Parameter,  # noqa: F722
+):
+    alpha_0, beta_0 = hyperparameters
 
     counts = jnp.bincount(assignments, length=alpha_0.shape[0])
     x_sum = jax.ops.segment_sum(x, assignments, alpha_0.shape[0])
-    mu_post = (mu_0 + x_sum) / (alpha_0 + counts[:, None])
+    alpha_post = alpha_0 + x_sum
+    beta_post = beta_0 + counts - x_sum
 
-    noise = jax.random.dirichlet(key, alpha_0)
-    return noise + mu_post
+    return jax.random.beta(key, alpha_post, beta_post)
