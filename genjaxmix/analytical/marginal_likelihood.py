@@ -71,16 +71,12 @@ def _sml_gamma_normal(prior: dist.Gamma, likelihood: dist.Normal):
 
 def _sml_dirichlet_categorical(
     hyperparameters: Float[Array, " kl"],  # noqa: F722
-    observations: Float[Array, " nl"],  # noqa: F722
+    observations: Int[Array, " nl"],  # noqa: F722
     assignments: Int[Array, " n"],  # noqa: F722
+    cardinalities,
 ):
-    (alpha, cardinalities) = hyperparameters
-    K = alpha.shape[0]
-    alpha_0 = jnp.sum(alpha, axis=1)
-    print(alpha_0)
-    counts = jnp.bincount(assignments, length=K)
-
-    return counts
+    # jax.nn.one_hot(assignments, num_classes=cardinalities[0])
+    return jax.vmap(jax.nn.one_hot, in_axes=(None, 0))(assignments, cardinalities)
 
 
 def _sml_nig_normal(hyperparameters, x, assignments):
