@@ -3,7 +3,7 @@ import jax
 import genjaxmix.core as dist
 import jax.numpy as jnp
 from jaxtyping import Float, Array, Int
-from jax.scipy.special import gammaln, betaln
+from jax.scipy.special import gammaln
 
 
 @dispatch
@@ -22,7 +22,7 @@ def segmented_marginal_likelihood(prior: dist.Dirichlet, likelihood: dist.Catego
 
 
 @dispatch
-def segmented_marginal_likelihood(
+def segmented_marginal_likelihood(  # noqa: F811
     prior: dist.NormalInverseGamma, likelihood: dist.Normal
 ):
     return _sml_nig_normal

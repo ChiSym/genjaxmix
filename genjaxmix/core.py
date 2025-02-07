@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from jaxtyping import Float, Array, Int
+from jaxtyping import Array
 
 
 @jax.tree_util.register_dataclass
@@ -30,10 +30,7 @@ class Distribution(ABC):
 
 
 class NormalInverseGamma(Distribution):
-    def _sampler(self, key, *args):
-        mu_0, v_0, a_0, b_0 = args
-        shape = mu_0.shape
-        return (mu_0, v_0)
+    pass
 
 
 class Normal(Distribution):
@@ -49,8 +46,7 @@ class Normal(Distribution):
 
 
 class Dirichlet(Distribution):
-    def sample(self, key, *args):
-        alphas = args[0]
+    pass
 
 
 class Categorical(Distribution):

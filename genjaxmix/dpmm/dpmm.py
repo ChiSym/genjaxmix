@@ -11,7 +11,7 @@ def gibbs_pi(
     alpha: Float[Array, ""],  # noqa: F722
     assignments: Float[Array, " n"],  # noqa: F722
     pi: Float[Array, " k"],  # noqa: F722
-    K: Int[Array, ""],
+    K: Int[Array, ""],  # noqa: F722
 ):
     K_max = pi.shape[0]
     counts = jnp.bincount(assignments, length=K_max)

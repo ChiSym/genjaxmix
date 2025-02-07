@@ -6,12 +6,12 @@ import jax
 
 
 @dispatch
-def logpdf(prior: core.Normal, likelihood: core.Normal):
+def logpdf(prior: core.Normal, likelihood: core.Normal):  # noqa: F811
     return _logpdf_normal_normal
 
 
 @dispatch
-def logpdf(prior: core.Gamma, likelihood: core.Normal):
+def logpdf(prior: core.Gamma, likelihood: core.Normal):  # noqa: F811
     return _log_gamma_normal
 
 

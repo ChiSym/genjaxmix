@@ -5,40 +5,41 @@ import jax
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.Normal, likelihood: core.Normal):
+def segmented_posterior_sampler(prior: core.Normal, likelihood: core.Normal):  # noqa: F811
     return _sps_normal_normal
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Normal):
+def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Normal):  # noqa: F811
     return _sps_gamma_normal
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.Dirichlet, likelihood: core.Categorical):
+def segmented_posterior_sampler(prior: core.Dirichlet, likelihood: core.Categorical):  # noqa: F811
     return _sps_dirichlet_categorical
 
 
 @dispatch
-def segmented_posterior_sampler(
+def segmented_posterior_sampler(  # noqa: F811
     prior: core.NormalInverseGamma, likelihood: core.Normal
 ):
     return _sps_nig_normal
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.Beta, likelihood: core.Bernoulli):
+def segmented_posterior_sampler(prior: core.Beta, likelihood: core.Bernoulli):  # noqa: F811
     return _sps_beta_bernoulli
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):
+def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):  # noqa: F811
     pass
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.InverseGamma, likelihood: core.Normal):
+def segmented_posterior_sampler(prior: core.InverseGamma, likelihood: core.Normal):  # noqa: F811
     return _sps_inverse_gamma_normal
+
 
 #######
 def _sps_normal_normal(
@@ -89,7 +90,7 @@ def _sps_inverse_gamma_normal(
 
     alpha_new = alpha_0 + 0.5 * counts
     beta_new = beta_0 + 0.5 * sum_squared_diff
-    return 1/jax.random.gamma(key, alpha_new, beta_new, shape=mu.shape)
+    return 1 / jax.random.gamma(key, alpha_new, beta_new, shape=mu.shape)
 
 
 def _sps_nig_normal(
@@ -118,12 +119,29 @@ def _sps_nig_normal(
 
 def _sps_dirichlet_categorical(
     key,
-    hyperparameters: core.Parameter,  # noqa: F722
-    x: core.Parameter,  # noqa: F722
-    assignments: core.Parameter,  # noqa: F722
+    hyperparameters,  # noqa: F722
+    x,  # noqa: F722
+    assignments,  # noqa: F722
 ):
-    alpha, segment_ids = hyperparameters
-    raise NotImplementedError()
+    # See https://github.com/chi-collective/minijaxmix/blob/main/minijaxmix/query.py#L29
+    alpha, segment_ids, K_arr, F_arr = hyperparameters
+    K = K_arr.shape[0]
+    F = F_arr.shape[0]
+
+    counts = jax.ops.segment_sum(x.astype(jnp.int32), assignments, K)
+    alpha_new = alpha + counts
+
+    y = jax.random.loggamma(key, alpha_new)
+    c = jnp.max(y, axis=1)
+    y_exp = jnp.exp(y - c[:, None])
+    y_sum = jax.ops.segment_sum(
+        y_exp.T, segment_ids, num_segments=F, indices_are_sorted=True
+    )
+    y_sum = jnp.log(y_sum)
+    y_sum = y_sum.T
+    y_sum += c[:, None]
+    y_sum_full = y_sum.take(segment_ids, axis=1)
+    return y - y_sum_full
 
 
 def _sps_beta_bernoulli(
