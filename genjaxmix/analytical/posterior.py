@@ -40,6 +40,10 @@ def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):  #
 def segmented_posterior_sampler(prior: core.InverseGamma, likelihood: core.Normal):  # noqa: F811
     return _sps_inverse_gamma_normal
 
+@dispatch
+def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):
+    return _sps_gamma_poisson
+
 
 #######
 def _sps_normal_normal(
@@ -73,7 +77,7 @@ def _sps_gamma_normal(
 
     alpha_new = alpha_0 + 0.5 * counts
     beta_new = beta_0 + 0.5 * sum_squared_diff
-    return jax.random.gamma(key, alpha_new, beta_new, shape=mu.shape)
+    return jax.random.gamma(key, alpha_new, beta_new)
 
 
 def _sps_inverse_gamma_normal(
@@ -90,7 +94,7 @@ def _sps_inverse_gamma_normal(
 
     alpha_new = alpha_0 + 0.5 * counts
     beta_new = beta_0 + 0.5 * sum_squared_diff
-    return 1 / jax.random.gamma(key, alpha_new, beta_new, shape=mu.shape)
+    return 1 / jax.random.gamma(key, alpha_new, beta_new)
 
 
 def _sps_nig_normal(
@@ -112,7 +116,7 @@ def _sps_nig_normal(
     alpha_post = alpha_0 + counts / 2
     beta_post = beta_0 + 0.5 * (x_sum_sq + mu_0**2 / v_0 - mu_post**2 / v_post)
 
-    sigma_new = jax.random.gamma(key, alpha_post, 1 / beta_post, shape=v_0.shape)
+    sigma_new = jax.random.gamma(key, alpha_post, 1 / beta_post)
     mu_new = jax.random.normal(key, mu_0.shape) * jnp.sqrt(sigma_new) + mu_post
     return mu_new, sigma_new
 
@@ -158,3 +162,17 @@ def _sps_beta_bernoulli(
     beta_post = beta_0 + counts - x_sum
 
     return jax.random.beta(key, alpha_post, beta_post)
+
+
+def _sps_gamma_poisson(
+    key,
+    hyperparameters,  # noqa: F722
+    x,  # noqa: F722
+    assignments,  # noqa: F722
+):
+    shape, scale = hyperparameters
+    K = shape.shape[0]
+    x_sum = jax.ops.segment_sum(x, assignments, K)
+    shape_new = shape + x_sum
+    scale_new = scale / (jnp.bincount(assignments, length=K) * scale + 1)
+    return jax.random.gamma(key, shape_new, scale_new)

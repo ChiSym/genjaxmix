@@ -105,7 +105,7 @@ def _sss_nig_normal(
     x: Float[Array, "nl"],  # noqa: F821
     assignments: Float[Array, "n"],  # noqa: F821
 ):
-    v_0, mu_0, a_0, b_0 = parameters
+    a_0, b_0, mu_0, v_0 = parameters
     K = v_0.shape[0]
     counts = jnp.bincount(assignments, length=K)
     sum_x = jax.ops.segment_sum(x, assignments, K)
