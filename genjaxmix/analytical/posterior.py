@@ -40,6 +40,7 @@ def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):  #
 def segmented_posterior_sampler(prior: core.InverseGamma, likelihood: core.Normal):  # noqa: F811
     return _sps_inverse_gamma_normal
 
+
 @dispatch
 def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):
     return _sps_gamma_poisson
@@ -103,7 +104,7 @@ def _sps_nig_normal(
     x: core.Parameter,  # noqa: F722
     assignments: core.Parameter,  # noqa: F722
 ):
-    mu_0, v_0, alpha_0, beta_0 = hyperparameters
+    alpha_0, beta_0, mu_0, v_0 = hyperparameters
     K_max = alpha_0.shape[0]
 
     counts = jnp.bincount(assignments, length=K_max)
@@ -173,6 +174,9 @@ def _sps_gamma_poisson(
     shape, scale = hyperparameters
     K = shape.shape[0]
     x_sum = jax.ops.segment_sum(x, assignments, K)
+    counts = jnp.bincount(assignments, length=K)
     shape_new = shape + x_sum
-    scale_new = scale / (jnp.bincount(assignments, length=K) * scale + 1)
-    return jax.random.gamma(key, shape_new, scale_new)
+    scale_new = scale / (counts[:, None] * scale + 1)
+    mu_new = jax.random.gamma(key, shape_new)
+    mu_new *= scale_new
+    return mu_new

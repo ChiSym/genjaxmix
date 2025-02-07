@@ -24,9 +24,7 @@ class Parameter:
 
 
 class Distribution(ABC):
-    @abstractmethod
-    def sample(self, key, *args):
-        pass
+    pass
 
 
 class NormalInverseGamma(Distribution):
@@ -34,15 +32,7 @@ class NormalInverseGamma(Distribution):
 
 
 class Normal(Distribution):
-    def sample(self, key, *args):
-        mu = args[0]
-        sigma_sq = args[1]
-        shape = mu.shape
-        noise = jax.random.normal(key, shape=shape)
-        return (noise * jnp.sqrt(sigma_sq) + mu,)
-
-    def logpdf(self, *args):
-        pass
+    pass
 
 
 class Dirichlet(Distribution):
@@ -50,8 +40,7 @@ class Dirichlet(Distribution):
 
 
 class Categorical(Distribution):
-    def _sample(self, key):
-        pass
+    pass
 
 
 class Beta(Distribution):
@@ -63,8 +52,7 @@ class Bernoulli(Distribution):
 
 
 class Gamma(Distribution):
-    def sample(self, key, *args):
-        return
+    pass
 
 
 class Poisson(Distribution):
