@@ -21,7 +21,7 @@ def gibbs_pi(
     return pi_new
 
 
-def gibbs_z_proposal(prior: Distribution, likelihood: Distribution):
+def gibbs_z_proposal(likelihood: Distribution):
     """
     Returns a function that samples the assignments given the hyperparameters, parameters, observations, and pi.
 
@@ -29,11 +29,11 @@ def gibbs_z_proposal(prior: Distribution, likelihood: Distribution):
         prior: The prior distribution.
         likelihood: The likelihood distribution.
     """
-    logpdf_lambda = logpdf.logpdf(prior, likelihood)
+    logpdf_lambda = logpdf.logpdf(likelihood)
 
-    def _gibbs_z(key, hyperparameters, parameters, observations, pi, K):
-        log_pdfs = jax.vmap(logpdf_lambda, in_axes=(None, None, 0, None))(
-            hyperparameters, parameters, observations, K
+    def _gibbs_z(key, parameters, observations, pi, K):
+        log_pdfs = jax.vmap(logpdf_lambda, in_axes=(None, 0, None))(
+            parameters, observations, K
         )
         log_pdfs = log_pdfs + jnp.log(pi)
         z = jax.random.categorical(key, log_pdfs)
