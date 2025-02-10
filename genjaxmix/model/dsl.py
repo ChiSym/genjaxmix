@@ -6,14 +6,6 @@ from abc import abstractmethod, ABC
 from enum import Enum
 
 
-class DType(Enum):
-    CONSTANT = 0
-    NORMAL = 1
-    GAMMA = 2
-    INVERSE_GAMMA = 3
-    NORMAL_INVERSE_GAMMA = 4
-
-
 class Node(ABC):
     shape: list
 
@@ -22,13 +14,8 @@ class Node(ABC):
         pass
 
     @abstractmethod
-    def type(self):
-        pass
-
-    @abstractmethod
     def initialize(self, key):
         pass
-
 
 
 class Constant(Node):
@@ -38,9 +25,6 @@ class Constant(Node):
 
     def children(self):
         return []
-
-    def type(self):
-        return DType.CONSTANT
 
     def initialize(self, key):
         return self.value
@@ -83,15 +67,12 @@ class Normal(Node):
     def children(self):
         return [self.mu, self.sigma]
 
-    def type(self):
-        return DType.NORMAL
-
     def initialize(self, key):
         if not self.fused:
             return jax.random.normal(key, self.mu.shape)
 
     def __repr__(self):
-        return f"Normal({self.mu}, {self.sigma})" 
+        return f"Normal({self.mu}, {self.sigma})"
 
 
 class Gamma(Node):
@@ -121,8 +102,33 @@ class Gamma(Node):
     def children(self):
         return [self.alpha, self.beta]
 
-    def type(self):
-        return DType.GAMMA
+
+class Poisson(Node):
+    pass
+
+
+class Categorical(Node):
+    pass
+
+
+class Bernoulli(Node):
+    pass
+
+
+class Dirichlet(Node):
+    pass
+
+
+class NormalInverseGamma(Node):
+    pass
+
+
+class Beta(Node):
+    pass
+
+
+class InverseGamma(Node):
+    pass
 
 
 def is_constant(obj):

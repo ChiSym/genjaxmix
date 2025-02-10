@@ -1,18 +1,12 @@
-from genjaxmix.model.dsl import Node, DType
-from plum import dispatch
-import genjaxmix.core as core
+import genjaxmix.model.dsl as dsl
 import jax
+import genjaxmix.dpmm.dpmm as dpmm
+from plum import dispatch
 
-class Environment:
-    vars: dict
-    def __init__(self):
-        self.vars = dict()
-    def __setitem__(self, id, value):
-        if id in self.vars:
-            raise Exception("Variable already defined")
-        self.vars[id] = value
-    def __getitem__(self, id):
-        return self.vars[id]
+
+def posterior_rule_normal_normal(program):
+    pass
+
 
 class Program:
     edges: dict
@@ -20,7 +14,7 @@ class Program:
     types: list
     nodes: list
     node_to_id: dict
-    environment: Environment
+    environment: dict
     proposals: dict
 
     def __init__(self, model):
@@ -33,7 +27,7 @@ class Program:
 
         edges[0] = []
         backedges[0] = []
-        types.append(model.type())
+        types.append(type(model))
         nodes.append(model)
         node_to_id[model] = 0
         id = 1
@@ -46,7 +40,7 @@ class Program:
             for parent in node.children():
                 if parent not in node_to_id:
                     queue.append(parent)
-                    types.append(parent.type())
+                    types.append(type(parent))
                     nodes.append(parent)
                     edges[id] = []
                     backedges[id] = []
@@ -73,7 +67,6 @@ class Program:
         for id in range(len(self.nodes)):
             self.environment[id] = self.nodes[id].initialize(keys[id])
 
-    @dispatch
     def markov_blanket(self, id: int):
         parents = self.edges[id]
         children = self.backedges[id]
@@ -83,33 +76,79 @@ class Program:
         return {"parents": parents, "children": children, "cousins": cousins}
 
     @dispatch
-    def markov_blanket(self, node: Node):
-        self.markov_blanket(self.node_to_id[node])
+    def build_parameter_proposal(self, id: int):
+        blanket = self.markov_blanket(id)
+        if len(blanket["children"]) == 0: # shortcut to conjugate 
+            assert len(blanket["cousins"]) == 0
 
-    def build_proposal(self, id: int):
+            parent_types = tuple([self.types[i] for i in blanket["parents"]])
+            signature = (self.types[id], parent_types)
+
+            rule = conjugate_rule(signature)
+            if rule:
+                print("Signature: ", signature)
+                print("Rule ", rule)
+                posterior_args, posterior_pair = rule(self.edges, self.nodes, id)
+                parameter_proposal = dpmm.gibbs_parameters_proposal(*posterior_pair)
+
+                def gibbs_sweep(key, environment, observations, assignments):
+                    conditionals = [environment[ii] for ii in posterior_args]
+                    environment[id] = parameter_proposal(
+                        key, conditionals, observations, assignments
+                    )
+
+                    return environment
+
+                return gibbs_sweep
+
+    def build_single_proposal(self, id: int):
+        if self.types[id] == dsl.Constant:
+            return None
         blanket = self.markov_blanket(id)
         if len(blanket["children"]) == 0:
             assert len(blanket["cousins"]) == 0
 
-            likelihood = self.types[id]
-            priors = tuple([self.types[parent] for parent in blanket["parents"]])
+            parent_types = tuple([self.types[i] for i in blanket["parents"]])
+            signature = (self.types[id], parent_types)
 
-            # mu = Normal(mu_0, sigma_0)
-            # sigma = Constant
-            mu_id = blanket["parents"][0]
-            mu_0_id = self.edges[mu_id][0]
-            sig_0_id = self.edges[mu_id][1]
-            sig_id = blanket["parents"][1]
+            rule = conjugate_rule(signature)
+            if rule:
+                posterior_args, posterior_type = rule(self.edges, self.nodes, id)
+                logpdf_pair = self.nodes[id]
+                logpdf_args = tuple(self.edges[id])
+                parameter_proposal = dpmm.gibbs_parameters_proposal(*posterior_type)
+                z_proposal = dpmm.gibbs_z_proposal(logpdf_pair)
 
-            proposal = {
-                "var": mu_id,
-                "posterior_args": (mu_0_id, sig_0_id, sig_id),
-                "posterior": (core.Normal(), core.Normal()),
-                "logpdf_args": (mu_id, sig_id),
-                "logpdf": (core.Normal(), core.Normal())
-            }
-            return proposal
-            
+                def gibbs_sweep(key, pi, environment, observations, assignments):
+                    subkeys = jax.random.split(key, 2)
+                    conditionals = [environment[ii] for ii in posterior_args]
+                    environment[id] = parameter_proposal(
+                        subkeys[0], conditionals, observations, assignments
+                    )
+
+                    conditionals = [environment[ii] for ii in logpdf_args]
+                    assignments = z_proposal(
+                        subkeys[1], conditionals, observations, pi, 2
+                    )
+                    return environment, assignments
+
+                return gibbs_sweep
+
+    def build_proportion_proposal(self):
+        pass
+
+    @dispatch
+    def build_parameter_proposal(self):
+        proposals = dict()
+        for id in range(len(self.nodes)):
+            proposal = self.build_parameter_proposal(id)
+            if proposal:
+                proposals[id] = proposal
+        print(proposals)
+
+
+    def build_assignment_proposal(self):
+        pass
 
 
 ############
@@ -117,19 +156,31 @@ class Program:
 ############
 
 
+# CONJUGACY_RULES = {
+# }
+
+
+def foo1(edges, nodes, id):
+    mu_id, sig_id = edges[id]
+    mu_0_id, sig_0_id = edges[mu_id]
+    return (mu_0_id, sig_0_id, sig_id), (nodes[mu_id], nodes[id])
 
 
 CONJUGACY_RULES = {
-    DType.NORMAL: {
-        (DType.NORMAL, DType.CONSTANT): True,
-        (DType.CONSTANT, DType.GAMMA): True,
-        (DType.CONSTANT, DType.INVERSE_GAMMA): True,
-        (DType.NORMAL_INVERSE_GAMMA,): True,
-    },
+    dsl.Normal: {
+        (dsl.Normal, dsl.Constant): foo1,
+        (dsl.Constant, dsl.Gamma): True,
+        (dsl.Constant, dsl.InverseGamma): True,
+        (dsl.NormalInverseGamma,): True,
+    }
 }
 
 
-def conjugacy_rule(parent, child):
-    if parent not in CONJUGACY_RULES:
+def conjugate_rule(signature):
+    likelihood, parents = signature
+    if likelihood not in CONJUGACY_RULES:
         return None
-    return CONJUGACY_RULES[parent].get(child, None)
+    return CONJUGACY_RULES[likelihood].get(parents, None)
+
+
+# normal_normla

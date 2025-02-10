@@ -1,5 +1,7 @@
 from plum import dispatch
-import genjaxmix.core as core
+
+# import genjaxmix.core as core
+import genjaxmix.model.dsl as core
 import jax.numpy as jnp
 import jax
 
@@ -49,9 +51,9 @@ def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):
 #######
 def _sps_normal_normal(
     key,
-    hyperparameters: core.Parameter,  # noqa: F722
-    x: core.Parameter,  # noqa: F722
-    assignments: core.Parameter,  # noqa: F722
+    hyperparameters,  # noqa: F722
+    x,  # noqa: F722
+    assignments,  # noqa: F722
 ):
     mu_0, sig_sq_0, sig_sq = hyperparameters
 
@@ -66,9 +68,9 @@ def _sps_normal_normal(
 
 def _sps_gamma_normal(
     key,
-    hyperparameters: core.Parameter,  # noqa: F722
-    x: core.Parameter,  # noqa: F722
-    assignments: core.Parameter,  # noqa: F722
+    hyperparameters,  # noqa: F722
+    x,  # noqa: F722
+    assignments,  # noqa: F722
 ):
     alpha_0, beta_0, mu = hyperparameters
     counts = jnp.bincount(assignments, length=alpha_0.shape[0])
@@ -83,9 +85,9 @@ def _sps_gamma_normal(
 
 def _sps_inverse_gamma_normal(
     key,
-    hyperparameters: core.Parameter,  # noqa: F722
-    x: core.Parameter,  # noqa: F722
-    assignments: core.Parameter,  # noqa: F722
+    hyperparameters,  # noqa: F722
+    x,  # noqa: F722
+    assignments,  # noqa: F722
 ):
     alpha_0, beta_0, mu = hyperparameters
     counts = jnp.bincount(assignments, length=alpha_0.shape[0])
@@ -100,9 +102,9 @@ def _sps_inverse_gamma_normal(
 
 def _sps_nig_normal(
     key,
-    hyperparameters: core.Parameter,  # noqa: F722
-    x: core.Parameter,  # noqa: F722
-    assignments: core.Parameter,  # noqa: F722
+    hyperparameters,  # noqa: F722
+    x,  # noqa: F722
+    assignments,  # noqa: F722
 ):
     alpha_0, beta_0, mu_0, v_0 = hyperparameters
     K_max = alpha_0.shape[0]
@@ -151,9 +153,9 @@ def _sps_dirichlet_categorical(
 
 def _sps_beta_bernoulli(
     key,
-    hyperparameters: core.Parameter,  # noqa: F722
-    x: core.Parameter,  # noqa: F722
-    assignments: core.Parameter,  # noqa: F722
+    hyperparameters,  # noqa: F722
+    x,  # noqa: F722
+    assignments,  # noqa: F722
 ):
     alpha_0, beta_0 = hyperparameters
 
