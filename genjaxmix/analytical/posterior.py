@@ -78,9 +78,9 @@ def _sps_gamma_normal(
         (x - mu[assignments]) ** 2, assignments, alpha_0.shape[0]
     )
 
-    alpha_new = alpha_0 + 0.5 * counts
+    alpha_new = alpha_0 + 0.5 * counts[:, None]
     beta_new = beta_0 + 0.5 * sum_squared_diff
-    return jax.random.gamma(key, alpha_new, beta_new)
+    return jax.random.gamma(key, alpha_new) * beta_new
 
 
 def _sps_inverse_gamma_normal(

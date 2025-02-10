@@ -4,10 +4,6 @@ import genjaxmix.dpmm.dpmm as dpmm
 from plum import dispatch
 
 
-def posterior_rule_normal_normal(program):
-    pass
-
-
 class Program:
     edges: dict
     backedges: dict
@@ -78,17 +74,17 @@ class Program:
     @dispatch
     def build_parameter_proposal(self, id: int):
         blanket = self.markov_blanket(id)
-        if len(blanket["children"]) == 0: # shortcut to conjugate 
-            assert len(blanket["cousins"]) == 0
 
-            parent_types = tuple([self.types[i] for i in blanket["parents"]])
-            signature = (self.types[id], parent_types)
+        if len(blanket["children"]) == 1:  # shortcut to conjugate
+            child_id = blanket["children"][0]
 
-            rule = conjugate_rule(signature)
-            if rule:
-                print("Signature: ", signature)
-                print("Rule ", rule)
-                posterior_args, posterior_pair = rule(self.edges, self.nodes, id)
+            prior_type = self.types[id]
+            likelihood_type = self.types[child_id]
+
+            arg_rule = conjugate_rule(prior_type, likelihood_type)
+            if arg_rule:
+                posterior_pair = (self.nodes[id], self.nodes[child_id])
+                posterior_args = arg_rule(blanket)
                 parameter_proposal = dpmm.gibbs_parameters_proposal(*posterior_pair)
 
                 def gibbs_sweep(key, environment, observations, assignments):
@@ -146,7 +142,6 @@ class Program:
                 proposals[id] = proposal
         print(proposals)
 
-
     def build_assignment_proposal(self):
         pass
 
@@ -160,27 +155,24 @@ class Program:
 # }
 
 
-def foo1(edges, nodes, id):
-    mu_id, sig_id = edges[id]
-    mu_0_id, sig_0_id = edges[mu_id]
-    return (mu_0_id, sig_0_id, sig_id), (nodes[mu_id], nodes[id])
+def _arg_normal_normal(blanket):
+    mu_0_id, sig_0_id = blanket["parents"]
+    sig_id = blanket["cousins"][0]
+    return (mu_0_id, sig_0_id, sig_id)
 
 
+def _arg_gamma_normal(blanket):
+    alpha_id, beta_id = blanket["parents"]
+    mu_id = blanket["cousins"][0]
+    return (alpha_id, beta_id, mu_id)
+
+
+# prior-likelihood
 CONJUGACY_RULES = {
-    dsl.Normal: {
-        (dsl.Normal, dsl.Constant): foo1,
-        (dsl.Constant, dsl.Gamma): True,
-        (dsl.Constant, dsl.InverseGamma): True,
-        (dsl.NormalInverseGamma,): True,
-    }
+    (dsl.Normal, dsl.Normal): _arg_normal_normal,
+    (dsl.Gamma, dsl.Normal): _arg_gamma_normal,
 }
 
 
-def conjugate_rule(signature):
-    likelihood, parents = signature
-    if likelihood not in CONJUGACY_RULES:
-        return None
-    return CONJUGACY_RULES[likelihood].get(parents, None)
-
-
-# normal_normla
+def conjugate_rule(prior, likelihood):
+    return CONJUGACY_RULES.get((prior, likelihood), None)

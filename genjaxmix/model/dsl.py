@@ -102,6 +102,12 @@ class Gamma(Node):
     def children(self):
         return [self.alpha, self.beta]
 
+    def initialize(self, key):
+        if isinstance(self.alpha, Constant):
+            return jax.random.gamma(key, self.alpha.value) * self.beta.value
+        else:
+            raise NotImplementedError("WIP: Need to process in topological order")
+
 
 class Poisson(Node):
     pass
