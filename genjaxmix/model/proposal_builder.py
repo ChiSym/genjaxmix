@@ -171,6 +171,7 @@ def _arg_gamma_normal(blanket):
 CONJUGACY_RULES = {
     (dsl.Normal, dsl.Normal): _arg_normal_normal,
     (dsl.Gamma, dsl.Normal): _arg_gamma_normal,
+    (dsl.InverseGamma, dsl.Normal): _arg_gamma_normal
 }
 
 

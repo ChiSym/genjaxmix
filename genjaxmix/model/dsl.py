@@ -109,6 +109,34 @@ class Gamma(Node):
             raise NotImplementedError("WIP: Need to process in topological order")
 
 
+class InverseGamma(Node):
+    def __init__(self, alpha, beta): 
+        if len(alpha.shape) != 2:
+            raise ValueError("alpha must be a 2D array")
+        if len(beta.shape) != 2:
+            raise ValueError("beta must be a 2D array")
+        if alpha.shape != beta.shape:
+            raise ValueError("alpha and beta must have the same shape")
+
+        if is_constant(alpha):
+            alpha = Constant(alpha)
+        if is_constant(beta):
+            beta = Constant(beta)
+
+        self.alpha = alpha
+        self.beta = beta
+        self.shape = alpha.shape
+
+    def children(self):
+        return [self.alpha, self.beta]
+
+    def initialize(self, key):
+        if isinstance(self.alpha, Constant):
+            return jax.random.gamma(key, self.alpha.value) * self.beta.value
+        else:
+            raise NotImplementedError("WIP: Need to process in topological order")
+
+
 class Poisson(Node):
     pass
 
@@ -132,9 +160,6 @@ class NormalInverseGamma(Node):
 class Beta(Node):
     pass
 
-
-class InverseGamma(Node):
-    pass
 
 
 def is_constant(obj):
