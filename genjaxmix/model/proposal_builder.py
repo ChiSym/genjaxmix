@@ -1,6 +1,9 @@
 import genjaxmix.model.dsl as dsl
 import jax
+import jax.numpy as jnp
+import jax.scipy as jsp
 import genjaxmix.dpmm.dpmm as dpmm
+import genjaxmix.analytical.logpdf as lpdf
 from plum import dispatch
 
 
@@ -68,7 +71,7 @@ class Program:
         children = self.backedges[id]
         cousins = []
         for child in children:
-            cousins += self.edges[child]
+            cousins += filter(lambda i: i!=id, self.edges[child])
         return {"parents": parents, "children": children, "cousins": cousins}
 
     @dispatch
@@ -96,6 +99,27 @@ class Program:
                     return environment
 
                 return gibbs_sweep
+            else:
+                likelihood_fn = lpdf.logpdf(self.nodes[self.backedges[id][0]])
+                def mh_move(key, environment, observations, assignments):
+                    x = environment[id]
+                    x_new = x + jax.random.normal(key, shape=x.shape)
+                    def logdensity(x):
+                        prior = jnp.sum(jsp.stats.expon.logpdf(x, scale=environment[3]), axis=1)
+                        conditionals = (environment[blanket["cousins"][0]], environment[2])
+                        likelihood = jax.vmap(likelihood_fn, in_axes=(None, 0, None))(conditionals, observations, jnp.array([2]))
+                        likelihood = jax.ops.segment_sum(likelihood, assignments, num_segments=x.shape[0])
+                        likelihood = jnp.diag(likelihood)
+                        return prior + likelihood
+
+                    logprob = logdensity(x_new) - logdensity(x)
+                    logprob = jnp.minimum(0.0,logprob)
+
+                    u = jax.random.uniform(key, shape=x.shape[0])
+                    accept = u < jnp.exp(logprob)
+                    x = jnp.where(accept[:, None], x_new, x)
+                    environment[id] = x
+                return mh_move
 
     def build_single_proposal(self, id: int):
         if self.types[id] == dsl.Constant:
@@ -129,9 +153,6 @@ class Program:
                     return environment, assignments
 
                 return gibbs_sweep
-
-    def build_proportion_proposal(self):
-        pass
 
     @dispatch
     def build_parameter_proposal(self):
@@ -171,7 +192,7 @@ def _arg_gamma_normal(blanket):
 CONJUGACY_RULES = {
     (dsl.Normal, dsl.Normal): _arg_normal_normal,
     (dsl.Gamma, dsl.Normal): _arg_gamma_normal,
-    (dsl.InverseGamma, dsl.Normal): _arg_gamma_normal
+    (dsl.InverseGamma, dsl.Normal): _arg_gamma_normal,
 }
 
 

@@ -110,7 +110,7 @@ class Gamma(Node):
 
 
 class InverseGamma(Node):
-    def __init__(self, alpha, beta): 
+    def __init__(self, alpha, beta):
         if len(alpha.shape) != 2:
             raise ValueError("alpha must be a 2D array")
         if len(beta.shape) != 2:
@@ -136,6 +136,23 @@ class InverseGamma(Node):
         else:
             raise NotImplementedError("WIP: Need to process in topological order")
 
+class Exponential(Node):
+    def __init__(self, rate):
+        if len(rate.shape) != 2:
+            raise ValueError("rate must be a 2D array")
+
+        if is_constant(rate):
+            rate = Constant(rate)
+
+        self.rate = rate
+        self.shape = rate.shape
+
+    def children(self):
+        return [self.rate]
+    
+    def initialize(self, key):
+        if isinstance(self.rate, Constant):
+            return jax.random.exponential(key, shape=self.shape)/self.rate.value
 
 class Poisson(Node):
     pass
@@ -159,7 +176,6 @@ class NormalInverseGamma(Node):
 
 class Beta(Node):
     pass
-
 
 
 def is_constant(obj):

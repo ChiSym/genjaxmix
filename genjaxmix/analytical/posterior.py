@@ -97,7 +97,7 @@ def _sps_inverse_gamma_normal(
 
     alpha_new = alpha_0 + 0.5 * counts[:, None]
     beta_new = beta_0 + 0.5 * sum_squared_diff
-    return 1 / (jax.random.gamma(key, alpha_new)*beta_new)
+    return 1 / (jax.random.gamma(key, alpha_new) * beta_new)
 
 
 def _sps_nig_normal(
