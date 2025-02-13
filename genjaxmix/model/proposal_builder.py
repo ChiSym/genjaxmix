@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 import genjaxmix.dpmm.dpmm as dpmm
 import genjaxmix.analytical.logpdf as lpdf
+import genjaxmix.analytical.loglogpdf as loglogpdf
 from plum import dispatch
 
 
@@ -71,7 +72,7 @@ class Program:
         children = self.backedges[id]
         cousins = []
         for child in children:
-            cousins += filter(lambda i: i!=id, self.edges[child])
+            cousins += filter(lambda i: i != id, self.edges[child])
         return {"parents": parents, "children": children, "cousins": cousins}
 
     @dispatch
@@ -100,25 +101,67 @@ class Program:
 
                 return gibbs_sweep
             else:
-                likelihood_fn = lpdf.logpdf(self.nodes[self.backedges[id][0]])
+                prior_fn = loglogpdf.logpdf(self.nodes[id])
+                # TODO: is an observation node
+                is_observation_node = []
+                for child in blanket["children"]:
+                    is_observation_node.append(True)
+
+                likelihood_fns = [
+                    loglogpdf.logpdf(self.nodes[child]) for child in blanket["children"]
+                ]
+
                 def mh_move(key, environment, observations, assignments):
                     x = environment[id]
-                    x_new = x + jax.random.normal(key, shape=x.shape)
-                    def logdensity(x):
-                        prior = jnp.sum(jsp.stats.expon.logpdf(x, scale=environment[3]), axis=1)
-                        conditionals = (environment[blanket["cousins"][0]], environment[2])
-                        likelihood = jax.vmap(likelihood_fn, in_axes=(None, 0, None))(conditionals, observations, jnp.array([2]))
-                        likelihood = jax.ops.segment_sum(likelihood, assignments, num_segments=x.shape[0])
-                        likelihood = jnp.diag(likelihood)
-                        return prior + likelihood
+                    x_new = x + 0.1 * jax.random.normal(key, shape=x.shape)
 
-                    logprob = logdensity(x_new) - logdensity(x)
-                    logprob = jnp.minimum(0.0,logprob)
+                    prior_conditionals = [environment[ii] for ii in blanket["parents"]]
+                    ratio = 0.0
 
-                    u = jax.random.uniform(key, shape=x.shape[0])
+                    for child in blanket["children"]:
+                        input_nodes = self.edges[child]
+                        assert id in input_nodes
+                        idx = input_nodes.index(id)
+                        # TODO: perform shape promotion to ensure parameters have same shape as observations
+                        is_observation_node = True
+                        if is_observation_node:
+                            likelihood_conditionals = [
+                                environment[jj][assignments] for jj in input_nodes
+                            ]
+                            log_p_old = likelihood_fns[child](
+                                observations, likelihood_conditionals
+                            )
+                            likelihood_conditionals[idx] = x_new[assignments]
+                            log_p_new = likelihood_fns[child](
+                                observations, likelihood_conditionals
+                            )
+                            increment = log_p_new - log_p_old
+                            increment = jax.ops.segment_sum(
+                                increment, assignments, num_segments=x.shape[0]
+                            )
+                            # print(increment)
+                            ratio += increment
+                        else:
+                            likelihood_conditionals = [
+                                environment[jj][assignments] for jj in input_nodes
+                            ]
+                            log_p_old = likelihood_fns[child](likelihood_conditionals)
+                            likelihood_conditionals[idx] = x_new[assignments]
+                            log_p_new = likelihood_fns[child](likelihood_conditionals)
+                            ratio += log_p_new - log_p_old
+
+                    ratio += prior_fn(x_new, prior_conditionals) - prior_fn(
+                        x, prior_conditionals
+                    )
+                    logprob = jnp.minimum(0.0, ratio)
+
+                    u = jax.random.uniform(key, shape=ratio.shape)
                     accept = u < jnp.exp(logprob)
+                    # print(x, " -> ", x_new)
+                    # print(accept, " ", logprob)
                     x = jnp.where(accept[:, None], x_new, x)
-                    environment[id] = x
+                    return x
+
                 return mh_move
 
     def build_single_proposal(self, id: int):
@@ -161,19 +204,12 @@ class Program:
             proposal = self.build_parameter_proposal(id)
             if proposal:
                 proposals[id] = proposal
-        print(proposals)
-
-    def build_assignment_proposal(self):
-        pass
+        # print(proposals)
 
 
 ############
 # ANALYSIS #
 ############
-
-
-# CONJUGACY_RULES = {
-# }
 
 
 def _arg_normal_normal(blanket):

@@ -136,6 +136,7 @@ class InverseGamma(Node):
         else:
             raise NotImplementedError("WIP: Need to process in topological order")
 
+
 class Exponential(Node):
     def __init__(self, rate):
         if len(rate.shape) != 2:
@@ -149,10 +150,11 @@ class Exponential(Node):
 
     def children(self):
         return [self.rate]
-    
+
     def initialize(self, key):
         if isinstance(self.rate, Constant):
-            return jax.random.exponential(key, shape=self.shape)/self.rate.value
+            return jax.random.exponential(key, shape=self.shape) / self.rate.value
+
 
 class Poisson(Node):
     pass

@@ -32,6 +32,7 @@ def logpdf(likelihood: core.Categorical):
 def logpdf(likelihood: core.Bernoulli):
     return _logpdf_bernoulli
 
+
 @dispatch
 def logpdf(likelihood: core.Exponential):
     return _logpdf_exponential
@@ -70,11 +71,11 @@ def _logpdf_categorical(parameters, x, K):
     log_pdf = jnp.where(jnp.arange(K_max) < K, log_pdf, -jnp.inf)
     return log_pdf
 
+
 def _logpdf_exponential(parameters, x, K):
-    rate, = parameters
+    (rate,) = parameters
     K_max = rate.shape[0]
     log_p = jax.vmap(norm.logpdf, in_axes=(None, 0, 0))(x, jnp.zeros_like(rate), rate)
     log_p = jnp.sum(log_p, axis=1)
     log_p = jnp.where(jnp.arange(K_max) < K, log_p, -jnp.inf)
     return log_p
-
