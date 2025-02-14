@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 import genjaxmix.dpmm.dpmm as dpmm
 import genjaxmix.analytical.logpdf as logpdf
+from genjaxmix.model.utils import topological_sort
 from plum import dispatch
 
 
@@ -60,6 +61,7 @@ class Program:
         self.environment = environment
         self.nodes = nodes
         self.node_to_id = node_to_id
+        self.ordering = topological_sort(self.backedges)
 
     def initalize_parameters(self, key):
         keys = jax.random.split(key, len(self.nodes))

@@ -1,4 +1,4 @@
-from genjaxmix.model.proposal_builder import Program
+from genjaxmix.model.compile import Program
 import genjaxmix.model.dsl as dsl
 from graphviz import Digraph
 
