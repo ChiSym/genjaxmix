@@ -13,10 +13,10 @@ def test_sss_nig_normal():
     assignments = jnp.array([0, 0, 1], dtype=jax.numpy.int32)
     output = ss._sss_nig_normal((a_0, b_0, mu_0, v_0), x, assignments)
     expected = (
-        jnp.array([2 / 3, 1]),
         jnp.array([1 / 3, 1 / 2]),
-        jnp.array([1, 1 / 2]),
-        jnp.array([4 / 3, 1.0]),
+        jnp.array([1 / 3, 1 / 2]),
+        jnp.array([2, 3 / 2]),
+        jnp.array([4 / 3, 5 / 4]),
     )
 
     assert len(output) == 4

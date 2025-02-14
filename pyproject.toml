@@ -6,10 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12.5"
 dependencies = [
     "genjax",
+    "graphviz>=0.20.3",
     "jaxtyping>=0.2.36",
-    "multimethod>=2.0",
     "plum-dispatch>=2.5.7",
-    "pytest>=8.3.3",
 ]
 
 [project.optional-dependencies]

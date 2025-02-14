@@ -1,6 +1,4 @@
 from plum import dispatch
-
-# import genjaxmix.core as core
 import genjaxmix.model.dsl as core
 import jax.numpy as jnp
 import jax

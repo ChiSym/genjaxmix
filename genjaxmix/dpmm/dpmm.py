@@ -1,7 +1,6 @@
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Key, Float, Int
-from genjaxmix.core import Distribution
 from genjaxmix.analytical import logpdf
 from genjaxmix.analytical.posterior import segmented_posterior_sampler
 
@@ -21,7 +20,7 @@ def gibbs_pi(
     return pi_new
 
 
-def gibbs_z_proposal(likelihood: Distribution):
+def gibbs_z_proposal(likelihood):
     """
     Returns a function that samples the assignments given the hyperparameters, parameters, observations, and pi.
 
@@ -29,20 +28,24 @@ def gibbs_z_proposal(likelihood: Distribution):
         prior: The prior distribution.
         likelihood: The likelihood distribution.
     """
+    # logpdf_lambda = vlogpdf.logpdf(likelihood)
     logpdf_lambda = logpdf.logpdf(likelihood)
 
     def _gibbs_z(key, parameters, observations, pi, K):
-        log_pdfs = jax.vmap(logpdf_lambda, in_axes=(None, 0, None))(
-            parameters, observations, K
-        )
+        log_pdfs = jax.vmap(
+            jax.vmap(logpdf_lambda, in_axes=(None, 0)), in_axes=(0, None)
+        )(observations, parameters)
         log_pdfs = log_pdfs + jnp.log(pi)
+
+        K_max = parameters[0].shape
+        log_pdfs = jnp.where(jnp.arange(K_max) < K, log_pdfs, -jnp.inf)
         z = jax.random.categorical(key, log_pdfs)
         return z
 
     return _gibbs_z
 
 
-def gibbs_parameters_proposal(prior: Distribution, likelihood: Distribution):
+def gibbs_parameters_proposal(prior, likelihood):
     """
     Returns a function that samples the parameters from the posterior given the hyperparameters, observations, and assignments.
 
