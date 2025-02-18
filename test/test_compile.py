@@ -35,6 +35,7 @@ def test_basic():
         f"Expected {expected_ordering}, but got {program.ordering}"
     )
 
+
 def test_blanket_1():
     gamma = dsl.Gamma(jnp.ones((3, 2)), jnp.ones((3, 2)))
     normal = dsl.Normal(jnp.zeros((3, 2)), gamma)
@@ -45,35 +46,15 @@ def test_blanket_1():
     blanket_3 = program.markov_blanket(3)
     blanket_4 = program.markov_blanket(4)
 
-    expected_blanket_0 = {
-        "parents": [1,2],
-        "children": [],
-        "cousins": []
-    }
+    expected_blanket_0 = {"parents": [1, 2], "children": [], "cousins": []}
 
-    expected_blanket_1 = {
-        "parents": [],
-        "children": [0],
-        "cousins": [2]
-    }
+    expected_blanket_1 = {"parents": [], "children": [0], "cousins": [2]}
 
-    expected_blanket_2 = {
-        "parents": [3, 4],
-        "children": [0],
-        "cousins": [1]
-    }
+    expected_blanket_2 = {"parents": [3, 4], "children": [0], "cousins": [1]}
 
-    expected_blanket_3 = {
-        "parents": [],
-        "children": [2],
-        "cousins": [4]
-    }
+    expected_blanket_3 = {"parents": [], "children": [2], "cousins": [4]}
 
-    expected_blanket_4 = {
-        "parents": [],
-        "children": [2],
-        "cousins": [3]
-    }
+    expected_blanket_4 = {"parents": [], "children": [2], "cousins": [3]}
 
     assert blanket_0 == expected_blanket_0, (
         f"Expected {expected_blanket_1}, but got {blanket_1}"
@@ -94,4 +75,3 @@ def test_blanket_1():
     assert blanket_4 == expected_blanket_4, (
         f"Expected {expected_blanket_4}, but got {blanket_4}"
     )
-

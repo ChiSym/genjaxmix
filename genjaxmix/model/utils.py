@@ -1,4 +1,3 @@
-
 def topological_sort(graph):
     visited = set()
     ordering = []
@@ -20,4 +19,3 @@ def topological_sort(graph):
 
         ordering = sublist + ordering
     return ordering
-

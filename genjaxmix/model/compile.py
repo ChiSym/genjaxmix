@@ -36,7 +36,6 @@ class Program:
         while len(queue) > 0:
             node = queue.pop(0)
             child_id = node_to_id[node]
-            # environment[child_id] = node.value()
             for parent in node.children():
                 if parent not in node_to_id:
                     queue.append(parent)
