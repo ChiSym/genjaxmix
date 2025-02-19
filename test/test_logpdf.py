@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import pytest
 from jax.scipy.special import gammaln
 import genjaxmix.analytical.logpdf as logpdf
 
@@ -28,11 +29,12 @@ def test_logpdf_beta():
 
     assert jnp.all(jnp.isclose(output, expected))
 
-
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_logpdf_categorical():
     raise NotImplementedError()
 
 
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_logpdf_dirichlet():
     raise NotImplementedError()
 
@@ -59,18 +61,13 @@ def test_logpdf_gamma():
     assert jnp.all(jnp.isclose(output, expected))
 
 
+@pytest.mark.skip(reason="not implemented")
 def test_logpdf_inverse_gamma():
     raise NotImplementedError()
 
 
+@pytest.mark.skip(reason="not implemented")
 def test_logpdf_nig():
-    a_0, b_0, mu_0, tau_sq = (
-        jnp.array([[1.0]]),
-        jnp.array([[2.0]]),
-        jnp.array([[0.0]]),
-        jnp.array([[2.0]]),
-    )
-    x = jnp.array([[0.0, 1.0]])
     raise NotImplementedError()
 
 
@@ -119,5 +116,6 @@ def test_logpdf_uniform():
     assert jnp.all(jnp.isclose(output, expected))
 
 
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_logpdf_weibull():
     raise NotImplementedError()

@@ -71,9 +71,6 @@ def test_normal():
     assert jnp.array_equal(dist.children()[0].value, mu)
     assert jnp.array_equal(dist.children()[1].value, sigma)
 
-    mu_and_sigma = jnp.ones((3, 3))
-    # TODO: Consider fused args
-
 
 def test_normal_inverse_gamma():
     alpha = jnp.ones((3, 2))
