@@ -1,7 +1,6 @@
 import genjaxmix.model.dsl as dsl
 import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
 import genjaxmix.dpmm.dpmm as dpmm
 import genjaxmix.analytical.logpdf as logpdf
 from genjaxmix.model.utils import topological_sort
@@ -198,7 +197,7 @@ class Program:
                 return gibbs_sweep
 
     @dispatch
-    def build_parameter_proposal(self):
+    def build_parameter_proposal(self): # noqa: F811
         proposals = dict()
         for id in range(len(self.nodes)):
             proposal = self.build_parameter_proposal(id)

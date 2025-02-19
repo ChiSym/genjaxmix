@@ -132,7 +132,7 @@ class Gamma(Node):
         super().__init__()
 
     @dispatch
-    def __init__(self, alpha_and_beta: Node):
+    def __init__(self, alpha_and_beta: Node): # noqa: F811
         self.alpha = alpha_and_beta
         self.beta = alpha_and_beta
 
@@ -178,7 +178,7 @@ class Normal(Node):
     fused: bool
 
     @dispatch
-    def __init__(self, mu, sigma):
+    def __init__(self, mu, sigma): 
         if is_constant(mu):
             mu = wrap_constant(mu)
 
@@ -193,7 +193,7 @@ class Normal(Node):
         super().__init__()
 
     @dispatch
-    def __init__(self, mu_and_sigma: Node):
+    def __init__(self, mu_and_sigma: Node): # noqa: F811
         if is_constant(mu_and_sigma):
             raise NotImplementedError("mu_and_sigma must be a 3D array")
 

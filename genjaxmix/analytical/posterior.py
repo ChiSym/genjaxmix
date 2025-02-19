@@ -42,7 +42,7 @@ def segmented_posterior_sampler(prior: core.InverseGamma, likelihood: core.Norma
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):
+def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson): # noqa: F811
     return _sps_gamma_poisson
 
 

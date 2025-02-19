@@ -11,27 +11,27 @@ def logpdf(likelihood: core.Bernoulli):
 
 
 @dispatch
-def logpdf(likelihood: core.Beta):
+def logpdf(likelihood: core.Beta): # noqa: F811
     return _logpdf_beta
 
 
 @dispatch
-def logpdf(likelihood: core.Categorical):
+def logpdf(likelihood: core.Categorical): # noqa: F811
     return _logpdf_categorical
 
 
 @dispatch
-def logpdf(likelihood: core.Exponential):
+def logpdf(likelihood: core.Exponential): # noqa: F811
     return _logpdf_exponential
 
 
 @dispatch
-def logpdf(dist: core.Gamma):
+def logpdf(dist: core.Gamma): # noqa: F811
     return _logpdf_gamma
 
 
 @dispatch
-def logpdf(dist: core.InverseGamma):
+def logpdf(dist: core.InverseGamma): # noqa: F811
     return _logpdf_inverse_gamma
 
 
@@ -41,27 +41,27 @@ def logpdf(dist: core.Normal):  # noqa: F811
 
 
 @dispatch
-def logpdf(dist: core.NormalInverseGamma):
+def logpdf(dist: core.NormalInverseGamma): # noqa: F811
     return _logpdf_nig
 
 
 @dispatch
-def logpdf(dist: core.Pareto):
+def logpdf(dist: core.Pareto): # noqa: F811
     return _logpdf_pareto
 
 
 @dispatch
-def logpdf(likelihood: core.Poisson):
+def logpdf(likelihood: core.Poisson): # noqa: F811
     return _logpdf_poisson
 
 
 @dispatch
-def logpdf(likelihood: core.Uniform):
+def logpdf(likelihood: core.Uniform): # noqa: F811
     return _logpdf_uniform
 
 
 @dispatch
-def logpdf(likelihood: core.Weibull):
+def logpdf(likelihood: core.Weibull): # noqa: F811
     return _logpdf_weibull
 
 
