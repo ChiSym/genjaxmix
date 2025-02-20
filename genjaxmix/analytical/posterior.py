@@ -16,6 +16,7 @@ def get_segmented_posterior_sampler(prior_type, likelihood_type):
     }
     return signatures[(prior_type, likelihood_type)]
 
+
 @dispatch
 def segmented_posterior_sampler(prior: core.Normal, likelihood: core.Normal):  # noqa: F811
     return _sps_normal_normal
@@ -192,3 +193,20 @@ def _sps_gamma_poisson(
     mu_new = jax.random.gamma(key, shape_new)
     mu_new *= scale_new
     return mu_new
+
+
+def get_posterior_sampler(prior_type, likelihood_type):
+        signatures = {
+            (core.Normal, core.Normal): _posterior_normal_normal,
+        }
+    
+def _posterior_normal_normal(
+    key,
+    conditionals,  # noqa: F722
+):
+    mu_0, sig_sq_0, sig_sq, x = conditionals
+    sig_sq_post = 1 / (1 / sig_sq_0 + 1 / sig_sq)
+    mu_post = sig_sq_post * (mu_0 / sig_sq_0 + x / sig_sq)
+
+    noise = jax.random.normal(key, shape=mu_0.shape)
+    return noise * jnp.sqrt(sig_sq_post) + mu_post
