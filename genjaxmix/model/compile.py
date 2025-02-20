@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import genjaxmix.dpmm.dpmm as dpmm
 import genjaxmix.analytical.logpdf as logpdf
-from genjaxmix.model.utils import topological_sort
+from genjaxmix.model.utils import topological_sort, count_unique
 from dataclasses import dataclass
 from typing import List, Dict
 from genjaxmix.analytical.posterior import get_segmented_posterior_sampler, get_posterior_sampler
@@ -30,17 +30,20 @@ class Model(ABC):
     def observations(self):
         return self.observables
 
-    def compile(self, N, observation_nodes=None):
+    def compile(self, observables = None):
         self._discover_nodes()
-        # override observations
-        if observation_nodes is not None:
-            pass
+        
+        if observables is None:
+            observables = self.observations()
+
+        for observable in observables:
+            if observable not in self._nodes:
+                raise ValueError(f"Observation variable {observable} not found in model")
+        
+        observables = [self._nodes[observable] for observable in observables]
 
         self._discover_nodes()
-        self._codegen(N)
-
-    def to_genjax(self):
-        raise NotImplementedError()
+        self._codegen(observables)
 
     def _discover_nodes(self):
         node_to_id = dict()
@@ -96,13 +99,24 @@ class Model(ABC):
         self.nodes = nodes
         self.node_to_id = node_to_id
 
-    def _codegen(self, N):
-        self.build_parameter_proposal()
+    def _codegen(self, observables):
+        self.build_proportions_proposal()
+        self.build_parameter_proposal(observables)
+        self.build_assignment_proposal()
 
-    def build_parameter_proposal(self):
+        # combine
+        def proposal(key, environment, observations, assignments):
+            return environment
+
+        return proposal
+
+    def build_proportions_proposal(self):
+        self.proposals["pi"] = gibbs_pi
+
+    def build_parameter_proposal(self, observables):
         proposals = dict()
         for id in range(len(self.nodes)):
-            blanket = MarkovBlanket(self, id, self.observations())
+            blanket = MarkovBlanket(self, id, observables)
             proposal = build_parameter_proposal(blanket)
             if proposal:
                 proposals[id] = proposal
@@ -119,6 +133,12 @@ class Model(ABC):
 
         return parameter_proposal
 
+    def build_assignment_proposal(self):
+        pass
+        # def assignment_proposal(key, environment, observations):
+        #     return dpmm.dpmm(key, environment, observations, self.proposals["pi"], self.proposals)
+
+        # self.proposals["assignments"] = assignment_proposal
 
 @dataclass
 class MarkovBlanket:
@@ -158,6 +178,19 @@ class MarkovBlanket:
                 self.types[cousin] = types[cousin]
                 self.observed[cousin] = model.nodes[cousin] in observations
 
+
+def build_proportions_proposal():
+    return gibbs_pi
+
+def gibbs_pi(key, assignments, pi):
+    alpha = 1.0
+    K = count_unique(assignments)
+    K_max = pi.shape[0]
+    counts = jnp.bincount(assignments, length=K_max)
+    alpha_new = jnp.where(jnp.arange(K_max) < K, counts, alpha)
+    alpha_new = jnp.where(jnp.arange(K_max) < K + 1, alpha_new, 0.0)
+    pi_new = jax.random.dirichlet(key, alpha_new)
+    return pi_new
 
 def build_parameter_proposal(blanket: Model):
     id = blanket.id
@@ -227,6 +260,7 @@ def build_gibbs_proposal(blanket: MarkovBlanket):
             environment[id] = parameter_proposal(key, conditionals)
             return environment
         
+        raise NotImplementedError("Incorrect logic")
         return gibbs_sweep
     else:
         parameter_proposal = get_segmented_posterior_sampler(*proposal_signature)
