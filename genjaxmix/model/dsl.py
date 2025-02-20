@@ -11,7 +11,7 @@ class Node(ABC):
         self.check_dimensions()
 
     @abstractmethod
-    def children(self):
+    def parents(self):
         pass
 
     @abstractmethod
@@ -19,7 +19,7 @@ class Node(ABC):
         pass
 
     def check_dimensions(self):
-        inputs = self.children()
+        inputs = self.parents()
         for arg in inputs:
             if len(arg.shape) != 2:
                 raise ValueError("All parameters must be 2D arrays")
@@ -44,7 +44,7 @@ class Bernoulli(Node):
 
         super().__init__()
 
-    def children(self):
+    def parents(self):
         return [self.p]
 
     def initialize(self, key):
@@ -69,7 +69,7 @@ class Beta(Node):
         self.beta = beta
         self.shape = alpha.shape
 
-    def children(self):
+    def parents(self):
         return [self.alpha, self.beta]
 
     def initialize(self, key):
@@ -85,7 +85,7 @@ class Constant(Node):
         self.value = value
         self.shape = value.shape
 
-    def children(self):
+    def parents(self):
         return []
 
     def initialize(self, key):
@@ -109,7 +109,7 @@ class Exponential(Node):
 
         super().__init__()
 
-    def children(self):
+    def parents(self):
         return [self.rate]
 
     def initialize(self, key):
@@ -132,11 +132,11 @@ class Gamma(Node):
         super().__init__()
 
     @dispatch
-    def __init__(self, alpha_and_beta: Node): # noqa: F811
+    def __init__(self, alpha_and_beta: Node):  # noqa: F811
         self.alpha = alpha_and_beta
         self.beta = alpha_and_beta
 
-    def children(self):
+    def parents(self):
         return [self.alpha, self.beta]
 
     def initialize(self, key):
@@ -164,7 +164,7 @@ class InverseGamma(Node):
         self.beta = beta
         self.shape = alpha.shape
 
-    def children(self):
+    def parents(self):
         return [self.alpha, self.beta]
 
     def initialize(self, key):
@@ -178,7 +178,7 @@ class Normal(Node):
     fused: bool
 
     @dispatch
-    def __init__(self, mu, sigma): 
+    def __init__(self, mu, sigma):
         if is_constant(mu):
             mu = wrap_constant(mu)
 
@@ -193,7 +193,7 @@ class Normal(Node):
         super().__init__()
 
     @dispatch
-    def __init__(self, mu_and_sigma: Node): # noqa: F811
+    def __init__(self, mu_and_sigma: Node):  # noqa: F811
         if is_constant(mu_and_sigma):
             raise NotImplementedError("mu_and_sigma must be a 3D array")
 
@@ -203,7 +203,7 @@ class Normal(Node):
 
         super().__init__()
 
-    def children(self):
+    def parents(self):
         return [self.mu, self.sigma]
 
     def initialize(self, key):
@@ -236,7 +236,7 @@ class NormalInverseGamma(Node):
 
         super().__init__()
 
-    def children(self):
+    def parents(self):
         return [self.alpha, self.beta, self.mu, self.sigma]
 
     def initialize(self, key):
@@ -253,7 +253,7 @@ class Poisson(Node):
 
         super().__init__()
 
-    def children(self):
+    def parents(self):
         return [self.rate]
 
     def initialize(self, key):
@@ -274,7 +274,7 @@ class Pareto(Node):
 
         super().__init__()
 
-    def children(self):
+    def parents(self):
         return [self.concentration, self.scale]
 
     def initialize(self, key):
@@ -299,7 +299,7 @@ class Uniform(Node):
 
         super().__init__()
 
-    def children(self):
+    def parents(self):
         return [self.a, self.b]
 
     def initialize(self, key):
@@ -327,7 +327,7 @@ class Weibull(Node):
         self.scale = scale
         self.shape = concentration.shape
 
-    def children(self):
+    def parents(self):
         return [self.concentration, self.scale]
 
     def initialize(self, key):
@@ -347,10 +347,3 @@ def wrap_constant(obj):
     if isinstance(obj, Constant):
         return obj
     return Constant(obj)
-
-
-###############
-# OBSERVATION #
-###############
-class Observable:
-    pass

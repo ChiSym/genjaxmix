@@ -4,6 +4,18 @@ import jax.numpy as jnp
 import jax
 
 
+def get_segmented_posterior_sampler(prior_type, likelihood_type):
+    signatures = {
+        (core.Normal, core.Normal): _sps_normal_normal,
+        (core.Gamma, core.Normal): _sps_gamma_normal,
+        (core.Dirichlet, core.Categorical): _sps_dirichlet_categorical,
+        (core.NormalInverseGamma, core.Normal): _sps_nig_normal,
+        (core.Beta, core.Bernoulli): _sps_beta_bernoulli,
+        (core.InverseGamma, core.Normal): _sps_inverse_gamma_normal,
+        (core.Gamma, core.Poisson): _sps_gamma_poisson,
+    }
+    return signatures[(prior_type, likelihood_type)]
+
 @dispatch
 def segmented_posterior_sampler(prior: core.Normal, likelihood: core.Normal):  # noqa: F811
     return _sps_normal_normal
@@ -42,7 +54,7 @@ def segmented_posterior_sampler(prior: core.InverseGamma, likelihood: core.Norma
 
 
 @dispatch
-def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson): # noqa: F811
+def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):  # noqa: F811
     return _sps_gamma_poisson
 
 
