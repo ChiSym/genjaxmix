@@ -1,5 +1,5 @@
 import genjaxmix.model.dsl as dsl
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, ABCMeta
 import jax
 import jax.numpy as jnp
 import genjaxmix.analytical.logpdf as logpdf
@@ -12,9 +12,18 @@ from genjaxmix.analytical.posterior import (
 )
 
 
-class Model(ABC):
+class PostInitCaller(ABCMeta):
+    def __call__(cls, *args, **kwargs):
+        obj = type.__call__(cls, *args, **kwargs)
+        obj.__post_init__()
+        return obj
+
+class Model(ABC, metaclass=PostInitCaller):
     def __init__(self):
         self._nodes = dict()
+
+    def __post_init__(self):
+        self._discover_nodes()
 
     def __setattr__(self, name, value):
         if isinstance(value, dsl.Node):
@@ -22,7 +31,6 @@ class Model(ABC):
         super().__setattr__(name, value)
 
     def initalize_parameters(self, key):
-        self._discover_nodes()
         environment = dict()
 
         keys = jax.random.split(key, len(self.nodes))
@@ -60,8 +68,7 @@ class Model(ABC):
 
         observables = [self._nodes[observable] for observable in observables]
 
-        self._discover_nodes()
-        self._codegen(observables)
+        return self._codegen(observables)
 
     def _discover_nodes(self):
         node_to_id = dict()
@@ -118,7 +125,6 @@ class Model(ABC):
         self.node_to_id = node_to_id
 
     def _codegen(self, observables):
-        self.proposals = dict()
 
         self.build_proportions_proposal()
         self.build_parameter_proposal(observables)
@@ -126,9 +132,15 @@ class Model(ABC):
 
         # combine all proposals in one program
 
-        def proposal(key, environment, observations, assignments):
-            return environment
-
+        def proposal(key, environment, pi, assignments):
+            environment = environment.copy()
+            subkeys = jax.random.split(key, 4)
+            pi = self.pi_proposal(subkeys[0], assignments, pi)
+            environment = self.parameter_proposal(subkeys[1], environment, assignments)
+            assignments = self.assignment_proposal(subkeys[2], environment, pi, assignments)
+            return environment, assignments, pi
+        
+        self.infer = proposal
         return proposal
 
     def build_proportions_proposal(self):
