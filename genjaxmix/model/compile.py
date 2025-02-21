@@ -2,7 +2,6 @@ import genjaxmix.model.dsl as dsl
 from abc import ABC, abstractmethod
 import jax
 import jax.numpy as jnp
-import genjaxmix.dpmm.dpmm as dpmm
 import genjaxmix.analytical.logpdf as logpdf
 from genjaxmix.model.utils import topological_sort, count_unique
 from dataclasses import dataclass
@@ -121,7 +120,7 @@ class Model(ABC):
     def _codegen(self, observables):
         self.proposals = dict()
 
-        self.proposals["pi"] = gibbs_pi
+        self.build_proportions_proposal()
         self.build_parameter_proposal(observables)
         self.build_assignment_proposal(observables)
 
@@ -133,7 +132,7 @@ class Model(ABC):
         return proposal
 
     def build_proportions_proposal(self):
-        self.proposals["pi"] = gibbs_pi
+        self.pi_proposal = gibbs_pi
 
     def build_parameter_proposal(self, observables):
         proposals = dict()
@@ -142,7 +141,18 @@ class Model(ABC):
             proposal = build_parameter_proposal(blanket)
             if proposal:
                 proposals[id] = proposal
-        self.proposals["parameters"] = proposals
+        self.parameter_proposals = proposals
+
+        # combine parameter proposals
+        def parameter_proposal(key, environment, assignments):
+            environment = environment.copy()
+            for id in self.parameter_proposals.keys():
+                environment = self.parameter_proposals[id](key, environment, assignments)
+            return environment
+
+        self.parameter_proposal = parameter_proposal
+
+        return self.parameter_proposal
 
     def build_assignment_proposal(self, observables):
         likelihoods = dict()
@@ -178,6 +188,7 @@ class Model(ABC):
             return z
 
         self.assignment_proposal = assignment_proposal
+        return self.assignment_proposal
 
 
 @dataclass
@@ -327,7 +338,7 @@ def build_gibbs_proposal(blanket: MarkovBlanket):
     if not likelihood_observed:
         parameter_proposal = get_posterior_sampler(*proposal_signature)
 
-        def gibbs_sweep(key, environment, observations, assignments):
+        def gibbs_sweep(key, environment, assignments):
             environment = environment.copy()
             conditionals = [environment[ii] for ii in posterior_args]
             environment[id] = parameter_proposal(key, conditionals)
@@ -359,13 +370,14 @@ def build_mh_proposal(blanket: MarkovBlanket):
 
     # likelihood_fns = [logpdf.logpdf(self.nodes[child]) for child in blanket["children"]]
 
-    def mh_move(key, environment, observations, assignments):
-        environment = environment.copy()
-        x = environment[blanket.id]
-        x_new = x + 0.1 * jax.random.normal(key, shape=x.shape)
+    def mh_move(key, environment, assignments):
+        return environment
+        # environment = environment.copy()
+        # x = environment[blanket.id]
+        # x_new = x + 0.1 * jax.random.normal(key, shape=x.shape)
 
-        prior_conditionals = [environment[ii] for ii in blanket.parents]
-        ratio = jnp.zeros(x.shape[0])
+        # prior_conditionals = [environment[ii] for ii in blanket.parents]
+        # ratio = jnp.zeros(x.shape[0])
 
         #     for child in blanket["children"]:
         #         input_nodes = self.edges[child]
@@ -397,7 +409,7 @@ def build_mh_proposal(blanket: MarkovBlanket):
         #     ratio += prior_fn(x_new, prior_conditionals) - prior_fn(x, prior_conditionals)
         #     logprob = jnp.minimum(0.0, ratio)
 
-        u = jax.random.uniform(key, shape=ratio.shape)
+        # u = jax.random.uniform(key, shape=ratio.shape)
         # accept = u < jnp.exp(logprob)
         # x = jnp.where(accept[:, None], x_new, x)
         # return x

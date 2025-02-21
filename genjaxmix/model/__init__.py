@@ -1,1 +1,35 @@
+from genjaxmix.model.compile import Model
+from genjaxmix.model.dsl import (
+    Bernoulli,
+    Beta,
+    Categorical,
+    Constant,
+    Dirichlet,
+    Exponential,
+    Gamma,
+    InverseGamma,
+    Normal,
+    NormalInverseGamma,
+    Poisson,
+    Pareto,
+    Uniform,
+    Weibull,
+)
 
+__all__ = [
+    "Model",
+    "Bernoulli",
+    "Beta",
+    "Categorical",
+    "Constant",
+    "Dirichlet",
+    "Exponential",
+    "Gamma",
+    "InverseGamma",
+    "Normal",
+    "NormalInverseGamma",
+    "Poisson",
+    "Pareto",
+    "Uniform",
+    "Weibull",
+]
