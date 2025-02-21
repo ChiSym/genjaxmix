@@ -245,14 +245,14 @@ class MarkovBlanket:
             types[child] = _types[child]
             observed[child] = model.nodes[child] in observations
 
-        cousins = dict()
+        coparent = dict()
         for child in children:
-            cousins[child] = edges[child]
-            for cousin in cousins[child]:
-                types[cousin] = _types[cousin]
-                observed[cousin] = model.nodes[cousin] in observations
+            coparent[child] = edges[child]
+            for ii in coparent[child]:
+                types[ii] = _types[ii]
+                observed[ii] = model.nodes[ii] in observations
 
-        return cls(id, parents, children, cousins, types, observed)
+        return cls(id, parents, children, coparent, types, observed)
 
 
 def gibbs_pi(key, assignments, pi):
@@ -387,6 +387,7 @@ def build_gibbs_proposal(blanket: MarkovBlanket):
 
 
 def _build_obs_likelihood_at_node(blanket: MarkovBlanket, substitute_id):
+    # TODO: Both cases seem to be the same. See if combining works.
     id = blanket.id
     observed = blanket.observed
     is_vectorized = observed[id] or any(
