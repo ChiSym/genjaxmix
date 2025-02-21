@@ -146,19 +146,38 @@ class Model(ABC):
 
     def build_assignment_proposal(self, observables):
         likelihoods = dict()
+        observed_likelihoods = dict()
+        latent_likelihoods = dict()
         for id in range(len(self.nodes)):
             if self.types[id] == dsl.Constant:
                 continue
             blanket = MarkovBlanket(self, id, observables)
-            logpdf, is_vectorized = build_loglikelihood(blanket)
+            logpdf, is_vectorized = build_loglikelihood_at_node(blanket)
             if logpdf:
-                likelihoods[id] = (logpdf, is_vectorized)
-        self.proposals["likelihoods"] = likelihoods
+                likelihoods[id] = logpdf
+                if is_vectorized:
+                    observed_likelihoods[id] = logpdf
+                else:
+                    latent_likelihoods[id] = logpdf
 
-        # self.proposals["assignments"] = proposals
+        self.likelihood_fns = likelihoods
 
-        # def assignment_proposal(key, environment, observations):
-        #     return dpmm.dpmm(key, environment, observations, self.proposals["pi"], self.proposals)
+        def assignment_proposal(key, environment, pi, assignments):
+            K = count_unique(assignments)
+            K_max = pi.shape[0]
+            log_p = jnp.zeros(pi.shape[0])
+            for id in latent_likelihoods.keys():
+                log_p += latent_likelihoods[id](environment)
+
+            for id in observed_likelihoods.keys():
+                log_p += observed_likelihoods[id](environment)
+
+            log_p += jnp.log(pi)
+            log_p = jnp.where(jnp.arange(K_max) < K, log_p, -jnp.inf)
+            z = jax.random.categorical(key, log_p)
+            return z
+
+        self.assignment_proposal = assignment_proposal
 
 
 @dataclass
@@ -200,10 +219,6 @@ class MarkovBlanket:
                 self.observed[cousin] = model.nodes[cousin] in observations
 
 
-def build_proportions_proposal():
-    return gibbs_pi
-
-
 def gibbs_pi(key, assignments, pi):
     alpha = 1.0
     K = count_unique(assignments)
@@ -226,7 +241,7 @@ def build_parameter_proposal(blanket: Model):
         return build_mh_proposal(blanket)
 
 
-def build_loglikelihood(blanket: MarkovBlanket):
+def build_loglikelihood_at_node(blanket: MarkovBlanket):
     id = blanket.id
     observed = blanket.observed
     is_vectorized = observed[id] or any(
@@ -236,8 +251,12 @@ def build_loglikelihood(blanket: MarkovBlanket):
     logpdf_lambda = logpdf.get_logpdf(blanket.types[id])
     if is_vectorized:
         print(f"loglikelihood is vectorized for {blanket.id}")
-        inner_axes = (None,)+tuple(None if blanket.observed[ii] else 0 for ii in blanket.parents)
-        outer_axes = (0,) + tuple(0 if blanket.observed[ii] else None for ii in blanket.parents)
+        inner_axes = (None,) + tuple(
+            None if blanket.observed[ii] else 0 for ii in blanket.parents
+        )
+        outer_axes = (0,) + tuple(
+            0 if blanket.observed[ii] else None for ii in blanket.parents
+        )
 
         def loglikelihood(environment):
             return jax.vmap(
