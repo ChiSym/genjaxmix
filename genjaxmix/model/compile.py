@@ -286,7 +286,6 @@ def build_loglikelihood_at_node(blanket: MarkovBlanket):
 
     logpdf_lambda = logpdf.get_logpdf(blanket.types[id])
     if is_vectorized:
-        print(f"loglikelihood is vectorized for {blanket.id}")
         inner_axes = (None,) + tuple(
             None if blanket.observed[ii] else 0 for ii in blanket.parents
         )
@@ -299,7 +298,6 @@ def build_loglikelihood_at_node(blanket: MarkovBlanket):
                 jax.vmap(logpdf_lambda, in_axes=inner_axes), in_axes=outer_axes
             )(environment[id], *[environment[parent] for parent in blanket.parents])
     else:
-        print(f"loglikelihood is scalar for {blanket.id}")
         axes = (0,) + tuple(0 for ii in blanket.parents)
 
         def loglikelihood(environment):
@@ -390,8 +388,6 @@ def build_gibbs_proposal(blanket: MarkovBlanket):
 
 def _build_obs_likelihood_at_node(blanket: MarkovBlanket, substitute_id):
     id = blanket.id
-    print("id ", id)
-    print("Substitute id ", substitute_id)
     observed = blanket.observed
     is_vectorized = observed[id] or any(
         [observed[parent] for parent in blanket.parents]
@@ -399,7 +395,6 @@ def _build_obs_likelihood_at_node(blanket: MarkovBlanket, substitute_id):
 
     logpdf_lambda = logpdf.get_logpdf(blanket.types[id])
     if is_vectorized:
-        print(f"MH loglikelihood is vectorized for {blanket.id}")
         axes = (0,) + tuple(0 for ii in blanket.parents)
 
         def loglikelihood(substituted_value, assignments, environment):
@@ -425,7 +420,6 @@ def _build_obs_likelihood_at_node(blanket: MarkovBlanket, substitute_id):
                 ],
             )
     else:
-        print(f"MH loglikelihood is scalar for {blanket.id}")
         axes = (0,) + tuple(0 for ii in blanket.parents)
 
         def loglikelihood(substituted_value, assignments, environment):
@@ -443,11 +437,6 @@ def _build_obs_likelihood_at_node(blanket: MarkovBlanket, substitute_id):
 
 
 def build_mh_proposal(blanket: MarkovBlanket):
-    # is_observation_node = []
-    # for child in blanket["children"]:
-    #     is_observation_node.append(child in self.observed)
-
-    # likelihood_fns = [logpdf.logpdf(self.nodes[child]) for child in blanket["children"]]
     likelihood_fns = {"observed": dict(), "unobserved": dict()}
     id = blanket.id
     likelihood, is_vectorized = _build_obs_likelihood_at_node(blanket, id)
