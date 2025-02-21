@@ -18,7 +18,8 @@ class PostInitCaller(ABCMeta):
         obj.__post_init__()
         return obj
 
-class Model(ABC, metaclass=PostInitCaller):
+
+class Model(ABC):
     def __init__(self):
         self._nodes = dict()
 
@@ -29,6 +30,12 @@ class Model(ABC, metaclass=PostInitCaller):
         if isinstance(value, dsl.Node):
             self._nodes[name] = value
         super().__setattr__(name, value)
+
+    def __getitem__(self, key):
+        return self.node_to_id[self._nodes[key]]
+
+    def __len__(self):
+        return len(self.nodes)
 
     def initalize_parameters(self, key):
         environment = dict()
@@ -125,7 +132,6 @@ class Model(ABC, metaclass=PostInitCaller):
         self.node_to_id = node_to_id
 
     def _codegen(self, observables):
-
         self.build_proportions_proposal()
         self.build_parameter_proposal(observables)
         self.build_assignment_proposal(observables)
@@ -137,9 +143,11 @@ class Model(ABC, metaclass=PostInitCaller):
             subkeys = jax.random.split(key, 4)
             pi = self.pi_proposal(subkeys[0], assignments, pi)
             environment = self.parameter_proposal(subkeys[1], environment, assignments)
-            assignments = self.assignment_proposal(subkeys[2], environment, pi, assignments)
+            assignments = self.assignment_proposal(
+                subkeys[2], environment, pi, assignments
+            )
             return environment, assignments, pi
-        
+
         self.infer = proposal
         return proposal
 
@@ -149,7 +157,7 @@ class Model(ABC, metaclass=PostInitCaller):
     def build_parameter_proposal(self, observables):
         proposals = dict()
         for id in range(len(self.nodes)):
-            blanket = MarkovBlanket(self, id, observables)
+            blanket = MarkovBlanket.from_model(self, id, observables)
             proposal = build_parameter_proposal(blanket)
             if proposal:
                 proposals[id] = proposal
@@ -159,7 +167,9 @@ class Model(ABC, metaclass=PostInitCaller):
         def parameter_proposal(key, environment, assignments):
             environment = environment.copy()
             for id in self.parameter_proposals.keys():
-                environment = self.parameter_proposals[id](key, environment, assignments)
+                environment = self.parameter_proposals[id](
+                    key, environment, assignments
+                )
             return environment
 
         self.parameter_proposal = parameter_proposal
@@ -173,7 +183,7 @@ class Model(ABC, metaclass=PostInitCaller):
         for id in range(len(self.nodes)):
             if self.types[id] == dsl.Constant:
                 continue
-            blanket = MarkovBlanket(self, id, observables)
+            blanket = MarkovBlanket.from_model(self, id, observables)
             logpdf, is_vectorized = build_loglikelihood_at_node(blanket)
             if logpdf:
                 likelihoods[id] = logpdf
@@ -212,34 +222,37 @@ class MarkovBlanket:
     types: Dict
     observed: Dict
 
-    def __init__(self, model: Model, id, observations):
+    @classmethod
+    def from_model(cls, model: Model, id: int, observations):
         edges = model.edges
         backedges = model.backedges
-        types = model.types
+        _types = model.types
 
-        self.types = dict()
-        self.observed = dict()
+        types = dict()
+        observed = dict()
 
-        self.id = id
-        self.types[id] = types[id]
-        self.observed[id] = model.nodes[id] in observations
+        id = id
+        types[id] = _types[id]
+        observed[id] = model.nodes[id] in observations
 
-        self.parents = edges[id]
-        for parent in self.parents:
-            self.types[parent] = types[parent]
-            self.observed[parent] = model.nodes[parent] in observations
+        parents = edges[id]
+        for parent in parents:
+            types[parent] = _types[parent]
+            observed[parent] = model.nodes[parent] in observations
 
-        self.children = backedges[id]
-        for child in self.children:
-            self.types[child] = types[child]
-            self.observed[child] = model.nodes[child] in observations
+        children = backedges[id]
+        for child in children:
+            types[child] = _types[child]
+            observed[child] = model.nodes[child] in observations
 
-        self.cousins = dict()
-        for child in self.children:
-            self.cousins[child] = edges[child]
-            for cousin in self.cousins[child]:
-                self.types[cousin] = types[cousin]
-                self.observed[cousin] = model.nodes[cousin] in observations
+        cousins = dict()
+        for child in children:
+            cousins[child] = edges[child]
+            for cousin in cousins[child]:
+                types[cousin] = _types[cousin]
+                observed[cousin] = model.nodes[cousin] in observations
+
+        return cls(id, parents, children, cousins, types, observed)
 
 
 def gibbs_pi(key, assignments, pi):
@@ -375,64 +388,111 @@ def build_gibbs_proposal(blanket: MarkovBlanket):
 ###############
 
 
+def _build_obs_likelihood_at_node(blanket: MarkovBlanket, substitute_id):
+    id = blanket.id
+    print("id ", id)
+    print("Substitute id ", substitute_id)
+    observed = blanket.observed
+    is_vectorized = observed[id] or any(
+        [observed[parent] for parent in blanket.parents]
+    )
+
+    logpdf_lambda = logpdf.get_logpdf(blanket.types[id])
+    if is_vectorized:
+        print(f"MH loglikelihood is vectorized for {blanket.id}")
+        axes = (0,) + tuple(0 for ii in blanket.parents)
+
+        def loglikelihood(substituted_value, assignments, environment):
+            def promote_shape(ii, arr, assignments):
+                if blanket.observed[ii]:
+                    return arr
+                else:
+                    return arr[assignments]
+
+            def swap(id):
+                if id == substitute_id:
+                    return substituted_value
+                else:
+                    return environment[id]
+
+            x = swap(id)
+
+            return jax.vmap(logpdf_lambda, in_axes=axes)(
+                promote_shape(id, x, assignments),
+                *[
+                    promote_shape(parent, swap(parent), assignments)
+                    for parent in blanket.parents
+                ],
+            )
+    else:
+        print(f"MH loglikelihood is scalar for {blanket.id}")
+        axes = (0,) + tuple(0 for ii in blanket.parents)
+
+        def loglikelihood(substituted_value, assignments, environment):
+            def swap(id):
+                if id == substitute_id:
+                    return substituted_value
+                else:
+                    return environment[id]
+
+            return jax.vmap(logpdf_lambda, in_axes=axes)(
+                swap(id), *[swap(parent) for parent in blanket.parents]
+            )
+
+    return loglikelihood, is_vectorized
+
+
 def build_mh_proposal(blanket: MarkovBlanket):
     # is_observation_node = []
     # for child in blanket["children"]:
     #     is_observation_node.append(child in self.observed)
 
     # likelihood_fns = [logpdf.logpdf(self.nodes[child]) for child in blanket["children"]]
+    likelihood_fns = {"observed": dict(), "unobserved": dict()}
+    id = blanket.id
+    likelihood, is_vectorized = _build_obs_likelihood_at_node(blanket, id)
+    if is_vectorized:
+        likelihood_fns["observed"][id] = likelihood
+    else:
+        likelihood_fns["unobserved"][id] = likelihood
+
+    for child in blanket.children:
+        fake_blanket = MarkovBlanket(
+            child, blanket.cousins[child], [], [], blanket.types, blanket.observed
+        )
+        likelihood, is_vectorized = _build_obs_likelihood_at_node(fake_blanket, id)
+        if is_vectorized:
+            likelihood_fns["observed"][child] = likelihood
+        else:
+            likelihood_fns["unobserved"][child] = likelihood
 
     def mh_move(key, environment, assignments):
+        environment = environment.copy()
+
+        # TODO: random walk must use the correct sample space
+        x_old = environment[id]
+        x_new = x_old + 0.1 * jax.random.normal(key, shape=x_old.shape)
+
+        ratio = 0.0
+        for ii, likelihood_fn in likelihood_fns["unobserved"].items():
+            ratio += likelihood_fn(x_new, assignments, environment)
+            ratio -= likelihood_fn(x_old, assignments, environment)
+
+        for ii, likelihood_fn in likelihood_fns["observed"].items():
+            increment = likelihood_fn(x_new, assignments, environment) - likelihood_fn(
+                x_old, assignments, environment
+            )
+            increment = jax.ops.segment_sum(
+                increment, assignments, num_segments=x_old.shape[0]
+            )
+            ratio += increment
+
+        logprob = jnp.minimum(0.0, ratio)
+
+        u = jax.random.uniform(key, shape=ratio.shape)
+        accept = u < jnp.exp(logprob)
+        x = jnp.where(accept[:, None], x_new, x_old)
+        environment[id] = x
         return environment
-        # environment = environment.copy()
-        # x = environment[blanket.id]
-        # x_new = x + 0.1 * jax.random.normal(key, shape=x.shape)
-
-        # prior_conditionals = [environment[ii] for ii in blanket.parents]
-        # ratio = jnp.zeros(x.shape[0])
-
-        #     for child in blanket["children"]:
-        #         input_nodes = self.edges[child]
-        #         assert id in input_nodes
-        #         idx = input_nodes.index(id)
-        #         # TODO: perform shape promotion to ensure parameters have same shape as observations
-        #         is_observation_node = True
-        #         if is_observation_node:
-        #             likelihood_conditionals = [
-        #                 environment[jj][assignments] for jj in input_nodes
-        #             ]
-        #             log_p_old = likelihood_fns[child](observations, likelihood_conditionals)
-        #             likelihood_conditionals[idx] = x_new[assignments]
-        #             log_p_new = likelihood_fns[child](observations, likelihood_conditionals)
-        #             increment = log_p_new - log_p_old
-        #             increment = jax.ops.segment_sum(
-        #                 increment, assignments, num_segments=x.shape[0]
-        #             )
-        #             ratio += increment
-        #         else:
-        #             likelihood_conditionals = [
-        #                 environment[jj][assignments] for jj in input_nodes
-        #             ]
-        #             log_p_old = likelihood_fns[child](likelihood_conditionals)
-        #             likelihood_conditionals[idx] = x_new[assignments]
-        #             log_p_new = likelihood_fns[child](likelihood_conditionals)
-        #             ratio += log_p_new - log_p_old
-
-        #     ratio += prior_fn(x_new, prior_conditionals) - prior_fn(x, prior_conditionals)
-        #     logprob = jnp.minimum(0.0, ratio)
-
-        # u = jax.random.uniform(key, shape=ratio.shape)
-        # accept = u < jnp.exp(logprob)
-        # x = jnp.where(accept[:, None], x_new, x)
-        # return x
 
     return mh_move
-
-
-####################
-# likelihood rules #
-####################
-
-
-def _logpdf_exponential(blanket: MarkovBlanket):
-    pass
