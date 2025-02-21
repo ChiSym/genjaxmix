@@ -62,14 +62,13 @@ def segmented_posterior_sampler(prior: core.Gamma, likelihood: core.Poisson):  #
 #######
 def _sps_normal_normal(
     key,
-    hyperparameters,  # noqa: F722
-    x,  # noqa: F722
+    conditionals,  # noqa: F722
     assignments,  # noqa: F722
 ):
-    mu_0, sig_sq_0, sig_sq = hyperparameters
+    mu_0, sig_sq_0, sig_sq, observations = conditionals
 
     counts = jnp.bincount(assignments, length=mu_0.shape[0])
-    x_sum = jax.ops.segment_sum(x, assignments, mu_0.shape[0])
+    x_sum = jax.ops.segment_sum(observations, assignments, mu_0.shape[0])
     sig_sq_post = 1 / (1 / sig_sq_0 + counts[:, None] / sig_sq)
     mu_post = sig_sq_post * (mu_0 / sig_sq_0 + x_sum / sig_sq)
 
@@ -196,10 +195,12 @@ def _sps_gamma_poisson(
 
 
 def get_posterior_sampler(prior_type, likelihood_type):
-        signatures = {
-            (core.Normal, core.Normal): _posterior_normal_normal,
-        }
-    
+    signatures = {
+        (core.Normal, core.Normal): _posterior_normal_normal,
+    }
+    return signatures[(prior_type, likelihood_type)]
+
+
 def _posterior_normal_normal(
     key,
     conditionals,  # noqa: F722

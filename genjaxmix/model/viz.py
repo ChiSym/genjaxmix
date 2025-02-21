@@ -1,27 +1,28 @@
-from genjaxmix.model.compile import Program
+import genjaxmix.model.compile as compile
 import genjaxmix.model.dsl as dsl
 from graphviz import Digraph
 
 
-def visualize(program: Program):
+def visualize(model: compile.Model):
     dot = Digraph()
 
-    def pretty_print(node):
+    def pretty_print(i):
+        node = model.nodes[i]
+        out = ""
         if isinstance(node, dsl.Constant):
-            return str(node.value)
+            out = str(node.value)
+        elif isinstance(node, dsl.Normal):
+            out = "Normal"
+        elif isinstance(node, dsl.Exponential):
+            out = "Exponential"
+        else:
+            out = str(node)
+        return f"{i}: {out}"
 
-        if isinstance(node, dsl.Normal):
-            return "Normal"
+    for i in range(len(model.nodes)):
+        dot.node(str(i), pretty_print(i))
 
-        if isinstance(node, dsl.Exponential):
-            return "Exponential"
-
-        return str(node)
-
-    for i, node in enumerate(program.nodes):
-        dot.node(str(i), pretty_print(node))
-
-    for i, adj in program.backedges.items():
+    for i, adj in model.backedges.items():
         for j in adj:
             dot.edge(str(i), str(j))
 
