@@ -1,5 +1,5 @@
 import genjaxmix.model.dsl as dsl
-import genjaxmix.model.compile as pb
+import genjaxmix.model.compile as compile
 import jax.numpy as jnp
 
 
@@ -7,7 +7,7 @@ def test_basic():
     gamma = dsl.Gamma(jnp.ones((3, 2)), jnp.ones((3, 2)))
     normal = dsl.Normal(jnp.zeros((3, 2)), gamma)
 
-    program = pb.Program(normal)
+    program = compile.Program(normal)
     expected_edges = {0: [1, 2], 1: [], 2: [3, 4], 3: [], 4: []}
     assert expected_edges == program.edges, (
         f"Expected {expected_edges}, but got {program.edges}"

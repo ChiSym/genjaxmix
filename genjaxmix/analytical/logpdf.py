@@ -83,20 +83,17 @@ def logpdf(likelihood: dsl.Weibull):  # noqa: F811
     return _logpdf_weibull
 
 
-def _logpdf_beta(x, parameters):
-    (alpha, beta) = parameters
+def _logpdf_beta(x, alpha, beta):
     log_p = jnp.sum(stats.beta.logpdf(x, alpha, beta), axis=1)
     return log_p
 
 
-def _logpdf_bernoulli(x, parameters):
-    (p,) = parameters
+def _logpdf_bernoulli(x, p):
     log_p = jnp.sum(stats.bernoulli.logpmf(x, p), axis=1)
     return log_p
 
 
-def _logpdf_categorical(x, parameters):
-    (log_p,) = parameters
+def _logpdf_categorical(x, log_p):
     log_pdf = jnp.sum(log_p * x[:, None], axis=1)
     return log_pdf
 
@@ -106,15 +103,13 @@ def _logpdf_exponential(x, rate):
     return log_p
 
 
-def _logpdf_gamma(x, parameters):
-    shape, scale = parameters
+def _logpdf_gamma(x, shape, scale):
     log_p = jnp.sum(stats.gamma.logpdf(x, shape, 0, scale), axis=1)
     return log_p
 
 
-def _logpdf_inverse_gamma(x, parameters):
-    shape, scale = parameters
-    log_p = jnp.sum(stats.gamma.logpdf(1 / x, shape, 0, scale), axis=1)
+def _logpdf_inverse_gamma(x, shape, scale):
+    log_p = jnp.sum(stats.gamma.logpdf(1 / x, shape, 0, scale) - 2 * jnp.log(x), axis=1)
     return log_p
 
 
@@ -123,39 +118,30 @@ def _logpdf_normal(x, mu, sigma):
     return log_p
 
 
-def _logpdf_nig(x, parameters):
-    (alpha, beta, mu, tau_sq) = parameters
-    log_p = stats.norm.logpdf(x, mu, jnp.sqrt(tau_sq)) + stats.gamma.logpdf(
-        tau_sq, alpha, 0, beta
-    )
+def _logpdf_nig(x1, x2, alpha, beta, mu, tau):
+    log_p = stats.norm.logpdf(x1, mu, tau) + stats.gamma.logpdf(x2, alpha, 0, beta)
     log_p = jnp.sum(log_p, axis=1)
     return log_p
 
 
-def _logpdf_pareto(x, parameters):
-    (shape, scale) = parameters
+def _logpdf_pareto(x, shape, scale):
     log_p = jnp.sum(stats.pareto.logpdf(x, shape, 0, scale), axis=1)
     return log_p
 
 
-def _logpdf_poisson(x, parameters):
-    (mu,) = parameters
+def _logpdf_poisson(x, mu):
     log_p = jnp.sum(stats.poisson.logpmf(x, mu), axis=1)
     return log_p
 
 
-def _logpdf_uniform(x, parameters):
-    (a, b) = parameters
+def _logpdf_uniform(x, a, b):
     log_p = jnp.sum(stats.uniform.logpdf(x, a, b - a), axis=1)
     return log_p
 
 
-def _logpdf_weibull(x, parameters):
-    (scale, concentration) = parameters
+def _logpdf_weibull(x, shape, scale):
     log_p = (
-        (concentration - 1) * jnp.log(x)
-        - (x / scale) ** concentration
-        + jnp.log(concentration / scale)
+        (shape - 1) * jnp.log(x / scale) - (x / scale) ** shape + jnp.log(shape / scale)
     )
     log_p = jnp.sum(log_p, axis=1)
     return log_p

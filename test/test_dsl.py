@@ -15,8 +15,8 @@ def test_bernoulli():
     p = jnp.ones((3, 2))
     dist = dsl.Bernoulli(p)
 
-    assert len(dist.children()) == 1
-    assert jnp.array_equal(dist.children()[0].value, p)
+    assert len(dist.parents()) == 1
+    assert jnp.array_equal(dist.parents()[0].value, p)
 
 
 def test_beta():
@@ -24,22 +24,22 @@ def test_beta():
     beta = 2 * jnp.ones((3, 2))
     dist = dsl.Beta(alpha, beta)
 
-    assert len(dist.children()) == 2
-    assert jnp.array_equal(dist.children()[0].value, alpha)
-    assert jnp.array_equal(dist.children()[1].value, beta)
+    assert len(dist.parents()) == 2
+    assert jnp.array_equal(dist.parents()[0].value, alpha)
+    assert jnp.array_equal(dist.parents()[1].value, beta)
 
 
 def test_constant():
     dist = dsl.Constant(jnp.ones((3, 2)))
-    assert dist.children() == []
+    assert dist.parents() == []
 
 
 def test_exponential():
     rate = jnp.ones((3, 2))
     dist = dsl.Exponential(rate)
 
-    assert len(dist.children()) == 1
-    assert jnp.array_equal(dist.children()[0].value, rate)
+    assert len(dist.parents()) == 1
+    assert jnp.array_equal(dist.parents()[0].value, rate)
 
 
 def test_gamma():
@@ -47,9 +47,9 @@ def test_gamma():
     beta = 2 * jnp.ones((3, 2))
     dist = dsl.Gamma(alpha, beta)
 
-    assert len(dist.children()) == 2
-    assert jnp.array_equal(dist.children()[0].value, alpha)
-    assert jnp.array_equal(dist.children()[1].value, beta)
+    assert len(dist.parents()) == 2
+    assert jnp.array_equal(dist.parents()[0].value, alpha)
+    assert jnp.array_equal(dist.parents()[1].value, beta)
 
 
 def test_inverse_gamma():
@@ -57,9 +57,9 @@ def test_inverse_gamma():
     beta = 2 * jnp.ones((3, 2))
     dist = dsl.InverseGamma(alpha, beta)
 
-    assert len(dist.children()) == 2
-    assert jnp.array_equal(dist.children()[0].value, alpha)
-    assert jnp.array_equal(dist.children()[1].value, beta)
+    assert len(dist.parents()) == 2
+    assert jnp.array_equal(dist.parents()[0].value, alpha)
+    assert jnp.array_equal(dist.parents()[1].value, beta)
 
 
 def test_normal():
@@ -67,9 +67,9 @@ def test_normal():
     sigma = jnp.ones((3, 2))
     dist = dsl.Normal(mu, sigma)
 
-    assert len(dist.children()) == 2
-    assert jnp.array_equal(dist.children()[0].value, mu)
-    assert jnp.array_equal(dist.children()[1].value, sigma)
+    assert len(dist.parents()) == 2
+    assert jnp.array_equal(dist.parents()[0].value, mu)
+    assert jnp.array_equal(dist.parents()[1].value, sigma)
 
 
 def test_normal_inverse_gamma():
@@ -80,11 +80,11 @@ def test_normal_inverse_gamma():
 
     dist = dsl.NormalInverseGamma(alpha, beta, mu, sigma)
 
-    assert len(dist.children()) == 4
-    assert jnp.array_equal(dist.children()[0].value, alpha)
-    assert jnp.array_equal(dist.children()[1].value, beta)
-    assert jnp.array_equal(dist.children()[2].value, mu)
-    assert jnp.array_equal(dist.children()[3].value, sigma)
+    assert len(dist.parents()) == 4
+    assert jnp.array_equal(dist.parents()[0].value, alpha)
+    assert jnp.array_equal(dist.parents()[1].value, beta)
+    assert jnp.array_equal(dist.parents()[2].value, mu)
+    assert jnp.array_equal(dist.parents()[3].value, sigma)
 
 
 def test_pareto():
@@ -92,9 +92,9 @@ def test_pareto():
     scale = 2 * jnp.ones((3, 2))
     dist = dsl.Pareto(concentration, scale)
 
-    assert len(dist.children()) == 2
-    assert jnp.array_equal(dist.children()[0].value, concentration)
-    assert jnp.array_equal(dist.children()[1].value, scale)
+    assert len(dist.parents()) == 2
+    assert jnp.array_equal(dist.parents()[0].value, concentration)
+    assert jnp.array_equal(dist.parents()[1].value, scale)
 
 
 def test_uniform():
@@ -102,9 +102,9 @@ def test_uniform():
     upper = 2 * jnp.ones((3, 2))
     dist = dsl.Uniform(lower, upper)
 
-    assert len(dist.children()) == 2
-    assert jnp.array_equal(dist.children()[0].value, lower)
-    assert jnp.array_equal(dist.children()[1].value, upper)
+    assert len(dist.parents()) == 2
+    assert jnp.array_equal(dist.parents()[0].value, lower)
+    assert jnp.array_equal(dist.parents()[1].value, upper)
 
 
 def test_weibull():
@@ -112,9 +112,9 @@ def test_weibull():
     scale = 2 * jnp.ones((3, 2))
     dist = dsl.Weibull(shape, scale)
 
-    assert len(dist.children()) == 2
-    assert jnp.array_equal(dist.children()[0].value, shape)
-    assert jnp.array_equal(dist.children()[1].value, scale)
+    assert len(dist.parents()) == 2
+    assert jnp.array_equal(dist.parents()[0].value, shape)
+    assert jnp.array_equal(dist.parents()[1].value, scale)
 
 
 def test_incorrect_dimensions():
