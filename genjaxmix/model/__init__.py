@@ -1,4 +1,4 @@
-from genjaxmix.model.compile import Model
+from genjaxmix.model.model import Model
 from genjaxmix.model.dsl import (
     Bernoulli,
     Beta,
