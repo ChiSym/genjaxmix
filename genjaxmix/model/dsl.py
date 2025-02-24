@@ -94,6 +94,9 @@ class Constant(Node):
     def __repr__(self):
         return f"Constant({self.value})"
 
+    def sample(self, key):
+        return self.value
+
 
 class Dirichlet(Node):
     pass
@@ -115,6 +118,9 @@ class Exponential(Node):
     def initialize(self, key):
         if isinstance(self.rate, Constant):
             return jax.random.exponential(key, shape=self.shape) / self.rate.value
+
+    def sample(self, key, rate):
+        return jax.random.exponential(key, shape=self.shape) / rate
 
 
 class Gamma(Node):
@@ -212,6 +218,9 @@ class Normal(Node):
 
     def __repr__(self):
         return f"Normal({self.mu}, {self.sigma})"
+
+    def sample(self, key, mu, sigma):
+        return jax.random.normal(key, shape=self.shape) * sigma + mu
 
 
 class NormalInverseGamma(Node):

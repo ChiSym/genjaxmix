@@ -203,7 +203,19 @@ class Model(ABC):
 
         self.assignment_proposal = assignment_proposal
         return self.assignment_proposal
+    
+    def sample(self, key):
+        environment = dict()
+        for id in self.ordering:
+            node = self.nodes[id]
+            if isinstance(node, dsl.Constant):
+                environment[id] = node.value
+            else:
+                args = [environment[parent] for parent in self.edges[id]]
+                environment[id] = node.sample(key, *args)
 
+
+        return environment
 
 
 def blanket_from_model(model: Model, id: int, observations):
