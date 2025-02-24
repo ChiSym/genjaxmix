@@ -167,6 +167,24 @@ wheels = [
 ]
 
 [[package]]
+name = "chex"
+version = "0.1.88"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "absl-py" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "numpy" },
+    { name = "setuptools" },
+    { name = "toolz" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/7a/3b8ca1c693a5ab0a03e48837c6da8659a0dd9f742248d69c4d8beae13d27/chex-0.1.88.tar.gz", hash = "sha256:565de897b1373232cdfca5e699f50fa49403d2c7d23f6c5a75a97ef713d2fe36", size = 90366 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/a0/e4bebe76bdd0a68077030f1b5e48b545597473ae1b773c84150311152efc/chex-0.1.88-py3-none-any.whl", hash = "sha256:234b61a5baa8132802e4b9c5657167d6c8a911d90a59a0bec47d537567e41b75", size = 99684 },
+]
+
+[[package]]
 name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
@@ -360,6 +378,20 @@ wheels = [
 ]
 
 [[package]]
+name = "etils"
+version = "1.12.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/f4/1b64bc8088adfeb421bb220cac71a7696a31e89c24c6f8a89a0d2427ab6a/etils-1.12.0.tar.gz", hash = "sha256:67aa7d549f9bee7851e07fbf0e099232b7f867c2825f468d7cbe728ab0d01bd8", size = 104245 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/83/bb4a4518bfa32a160dc455d8d944a6e00a7eb6759f449cb20c7b7879090e/etils-1.12.0-py3-none-any.whl", hash = "sha256:f80c2ff4289cc504b58b7e7a9f9db8b373a33227e43694a66808bcc81e51ffb8", size = 166570 },
+]
+
+[package.optional-dependencies]
+epy = [
+    { name = "typing-extensions" },
+]
+
+[[package]]
 name = "executing"
 version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -413,7 +445,7 @@ wheels = [
 
 [[package]]
 name = "genjax"
-version = "0.8.2.dev1"
+version = "0.9.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beartype" },
@@ -425,9 +457,9 @@ dependencies = [
     { name = "tensorflow-probability" },
     { name = "treescope" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c8/10/81f7560971a4eec9294256b1107cbd7dcbbbf822ea44e681834a5d7135e1/genjax-0.8.2.dev1.tar.gz", hash = "sha256:034bd2da1be9254e4c1bf69f9b2a33588933d35f71138111a20806c85b67d448", size = 103368 }
+sdist = { url = "https://files.pythonhosted.org/packages/39/11/66a54c496014e9c423dbb8054bfa8fce495a20d0fccbf3215c968519393d/genjax-0.9.3.tar.gz", hash = "sha256:ba686efa1051544ef6e47f9d2647a042700ab841d53bf3d0125297a0acb58c4a", size = 102612 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/26/633c35708727a1fb553132added3d105ccd3af6ad3106be13d3dcf7533c9/genjax-0.8.2.dev1-py3-none-any.whl", hash = "sha256:b197198253ba422aaa63bb72584e571c8471b2cdc157e8bb7fead0d9b2a8490a", size = 146549 },
+    { url = "https://files.pythonhosted.org/packages/42/e0/8dbd956d2a11b1b54f0b61adc9354f2df07381745d3e778bb381eebe209a/genjax-0.9.3-py3-none-any.whl", hash = "sha256:a091ae68eb85698db06a37723d165c707e292d45e76f2c00d85233f59269c799", size = 147920 },
 ]
 
 [[package]]
@@ -438,6 +470,7 @@ dependencies = [
     { name = "genjax" },
     { name = "graphviz" },
     { name = "jaxtyping" },
+    { name = "optax" },
     { name = "plum-dispatch" },
 ]
 
@@ -466,10 +499,11 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "genjax" },
+    { name = "genjax", specifier = ">=0.9.3" },
     { name = "graphviz", specifier = ">=0.20.3" },
     { name = "jax-metal", marker = "extra == 'm1'", specifier = ">=0.1.1" },
     { name = "jaxtyping", specifier = ">=0.2.36" },
+    { name = "optax", specifier = ">=0.2.4" },
     { name = "plum-dispatch", specifier = ">=2.5.7" },
 ]
 
@@ -1235,6 +1269,23 @@ wheels = [
 ]
 
 [[package]]
+name = "optax"
+version = "0.2.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "absl-py" },
+    { name = "chex" },
+    { name = "etils", extra = ["epy"] },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/af/b5/f88a0d851547b2e6b2c7e7e6509ad66236b3e7019f1f095bb03dbaa61fa1/optax-0.2.4.tar.gz", hash = "sha256:4e05d3d5307e6dde4c319187ae36e6cd3a0c035d4ed25e9e992449a304f47336", size = 229717 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/24/28d0bb21600a78e46754947333ec9a297044af884d360092eb8561575fe9/optax-0.2.4-py3-none-any.whl", hash = "sha256:db35c04e50b52596662efb002334de08c2a0a74971e4da33f467e84fac08886a", size = 319212 },
+]
+
+[[package]]
 name = "ordered-set"
 version = "4.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1794,6 +1845,15 @@ wheels = [
 ]
 
 [[package]]
+name = "setuptools"
+version = "75.8.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/ec/089608b791d210aec4e7f97488e67ab0d33add3efccb83a056cbafe3a2a6/setuptools-75.8.0.tar.gz", hash = "sha256:c5afc8f407c626b8313a86e10311dd3f661c6cd9c09d4bf8c15c0e11f9f2b0e6", size = 1343222 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/69/8a/b9dc7678803429e4a3bc9ba462fa3dd9066824d3c607490235c6a796be5a/setuptools-75.8.0-py3-none-any.whl", hash = "sha256:e3982f444617239225d675215d51f6ba05f845d4eec313da4418fdbb56fb27e3", size = 1228782 },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1855,6 +1915,15 @@ wheels = [
 ]
 
 [[package]]
+name = "toolz"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/0b/d80dfa675bf592f636d1ea0b835eab4ec8df6e9415d8cfd766df54456123/toolz-1.0.0.tar.gz", hash = "sha256:2c86e3d9a04798ac556793bced838816296a2f085017664e4995cb40a1047a02", size = 66790 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/98/eb27cc78ad3af8e302c9d8ff4977f5026676e130d28dd7578132a457170c/toolz-1.0.0-py3-none-any.whl", hash = "sha256:292c8f1c4e7516bf9086f8850935c799a874039c8bcf959d47b600e4c44a6236", size = 56383 },
+]
+
+[[package]]
 name = "tornado"
 version = "6.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1883,14 +1952,14 @@ wheels = [
 
 [[package]]
 name = "treescope"
-version = "0.1.8"
+version = "0.1.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/1c/1ba87dd2b44058424547067ff5cc9a69bc39a21a495b8b5b03a6d0619bb0/treescope-0.1.8.tar.gz", hash = "sha256:6a81bac3dccf84a8a8635fe43531e28c2c7e4ffbf571693259e54b9329612633", size = 530665 }
+sdist = { url = "https://files.pythonhosted.org/packages/26/27/80ad254da167e0055d5679aefd224ab08844a4cd55aeee7ef72c999d5fc6/treescope-0.1.9.tar.gz", hash = "sha256:ba6cdbdc9c5b52691d5f3bb4c5d5c7daa5627119acac8640b46d37e6aabe63a6", size = 544385 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/5c/3c97439d8f3846f376ce41d44c5ada8ff9c601c8f146293ca878145c59cd/treescope-0.1.8-py3-none-any.whl", hash = "sha256:56637aed9946834a62cca41eafd812b92df6119a6b6c16990d9e0f47a6a971d8", size = 175934 },
+    { url = "https://files.pythonhosted.org/packages/e4/09/b7e7bc5f21313d227e4fb98d2037646457ec06746327c5dd8ffed75e41e1/treescope-0.1.9-py3-none-any.whl", hash = "sha256:68677013a9f0228212fccf835f3fb037be07ae8b4c5f6f58eefab11198f83cf7", size = 182162 },
 ]
 
 [[package]]

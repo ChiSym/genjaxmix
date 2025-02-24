@@ -208,12 +208,8 @@ class Model(ABC):
         environment = dict()
         for id in self.ordering:
             node = self.nodes[id]
-            if isinstance(node, dsl.Constant):
-                environment[id] = node.value
-            else:
-                args = [environment[parent] for parent in self.edges[id]]
-                environment[id] = node.sample(key, *args)
-
+            args = [environment[parent] for parent in self.edges[id]]
+            environment[id] = node.sample(key, *args)
 
         return environment
 
