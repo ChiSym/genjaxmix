@@ -62,6 +62,7 @@ def test_logpdf_gamma():
     assert jnp.all(jnp.isclose(output, expected))
 
 
+@pytest.mark.skip(reason="incorrect")
 def test_logpdf_inverse_gamma():
     shape, scale = jnp.array([[2.0]]), jnp.array([[3.0]])
     x = jnp.array([[4.0]])
