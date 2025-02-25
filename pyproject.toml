@@ -5,7 +5,6 @@ description = "dpmm in genjax"
 readme = "README.md"
 requires-python = ">=3.12.5"
 dependencies = [
-    "equinox>=0.11.11",
     "genjax>=0.9.3",
     "graphviz>=0.20.3",
     "jaxtyping>=0.2.36",
