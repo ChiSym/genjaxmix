@@ -9,7 +9,6 @@ dependencies = [
     "genjax>=0.9.3",
     "graphviz>=0.20.3",
     "jaxtyping>=0.2.36",
-    "onnxruntime>=1.20.1",
     "plum-dispatch>=2.5.7",
 ]
 
