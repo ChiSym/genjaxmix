@@ -103,7 +103,7 @@ class JaxprToOnnx:
         """Add an input to the ONNX model."""
         name = self._get_var_name(var)
         input_def = helper.make_tensor_value_info(
-            name, self._numpy_dtype_to_onnx(type), shape
+            name, self._numpy_dtype_to_onnx(dtype), shape
         )
         self.inputs.append(input_def)
         return name
@@ -616,11 +616,13 @@ class JaxprToOnnx:
         input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])   
 
+        new_dtype = self._numpy_dtype_to_onnx(params["new_dtype"])
         node = helper.make_node(
-            "Identity",
+            "Cast",
             inputs = input_names,
             outputs = [output_name],
-            name = self._get_unique_name("ident/stop_gradient")
+            name = self._get_unique_name("convert_element_type"),
+            to = new_dtype
         )
         self.nodes.append(node)
 
@@ -632,7 +634,7 @@ class JaxprToOnnx:
             "Identity",
             inputs = input_names,
             outputs = [output_name],
-            name = self._get_unique_name("ident/stop_gradient")
+            name = self._get_unique_name("device_put")
         )
         self.nodes.append(node)
     
@@ -721,7 +723,12 @@ class JaxprToOnnx:
         """Process a JAXPR and convert it to ONNX nodes."""
         # Setup inputs
         for var in jaxpr.invars:
+            print(var)
+            print(var.aval.shape)
+            print(var.aval.dtype)
             self._add_input(var, var.aval.shape, var.aval.dtype)
+            print(self._get_name(var))
+            print()
         
         # Setup constants
         for i, const in enumerate(consts):
