@@ -453,7 +453,9 @@ class JaxprToOnnx:
         # input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
 
-        dtype = params["dtype"]
+        dtype = params["dtype"] # TODO: Use dtype
+        if dtype != jnp.int32:
+            raise NotImplementedError("dtype not implemented")
         shape = params["shape"]
 
         L = shape[0] # TODO: consider when len(shape) > 1
@@ -692,19 +694,34 @@ class JaxprToOnnx:
 
     def _handle_random_wrap(self, node_inputs, node_outputs, params):
         raise NotImplementedError("_handle_random_wrap")
-
-    def _handle_random_normal(self, node_inputs, node_outputs, params):
-        input_names = [self._get_name(inp) for inp in node_inputs]
+    
+    def _handle_random_uniform(self, node_inputs, node_outputs, params):
+        # input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
         shape = node_outputs[0].aval.shape
         if shape == ():
-            shape = None
+            shape = (1,)
+        node = helper.make_node(
+            "RandomUniform",
+            inputs = [],
+            outputs = [output_name],
+            name=self._get_unique_name("random_uniform"),
+            shape=shape
+        )
+        self.nodes.append(node)
+
+    def _handle_random_normal(self, node_inputs, node_outputs, params):
+        # input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        shape = node_outputs[0].aval.shape
+        if shape == ():
+            shape = (1,)
         node = helper.make_node(
             "RandomNormal",
             inputs = [],
             outputs = [output_name],
             name=self._get_unique_name("random_normal"),
-            shape=(1,)
+            shape=shape
         )
         self.nodes.append(node)
 
@@ -763,11 +780,15 @@ class JaxprToOnnx:
         name = jaxpr.params["name"]
         if name == "_normal":
             self._handle_random_normal(jaxpr.invars, jaxpr.outvars, jaxpr.params)
+        elif name == "_uniform":
+            self._handle_random_uniform(jaxpr.invars, jaxpr.outvars, jaxpr.params)
         elif name == "clip":
             self._process_closed_jaxpr(jaxpr)
         elif name == "sort":
             self._process_closed_jaxpr(jaxpr)
         elif name == "_where":
+            self._process_closed_jaxpr(jaxpr)
+        elif name == "_gumbel":
             self._process_closed_jaxpr(jaxpr)
         else:
             raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
