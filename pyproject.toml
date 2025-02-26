@@ -5,9 +5,12 @@ description = "dpmm in genjax"
 readme = "README.md"
 requires-python = ">=3.12.5"
 dependencies = [
+    "dill>=0.3.9",
     "genjax>=0.9.3",
     "graphviz>=0.20.3",
     "jaxtyping>=0.2.36",
+    "onnx>=1.17.0",
+    "onnxruntime>=1.20.1",
     "plum-dispatch>=2.5.7",
 ]
 
