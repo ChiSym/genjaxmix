@@ -61,10 +61,6 @@ class JaxprToOnnx:
         """Get or create a name for a JAX variable."""
         if var not in self.var_to_name:
             self.var_to_name[var] = self._get_unique_name(f"var")
-            if self.var_to_name[var] == "var_26":
-                pass
-        if self.var_to_name[var] == "var_26":
-            pass
         return self.var_to_name[var]
     
     def _get_constant_name(self, val):
@@ -72,9 +68,13 @@ class JaxprToOnnx:
         name = self._get_unique_name("const")
         # Convert to numpy and create tensor
         if isinstance(val, jax._src.core.Literal):
-            np_val = np.array(val.val)
+            actual_val = val.val
         else:
-            np_val = np.array(val)
+            actual_val = val
+        
+        np_val = np.array(actual_val)
+        # if np_val.dtype == np.int64:
+        #     np_val = np_val.astype(np.int32)
         tensor = helper.make_tensor(
             name=name,
             data_type=self._numpy_dtype_to_onnx(np_val.dtype),
@@ -318,10 +318,11 @@ class JaxprToOnnx:
         output_name = self._get_var_name(node_outputs[0])
 
         node = helper.make_node(
-            "Scatter",
+            "ScatterElements",
             inputs = input_names,
             outputs=[output_name],
-            name=self._get_unique_name("scatter_add")
+            name=self._get_unique_name("scatter_add"),
+            reduction="add"
         )
 
         self.nodes.append(node)
@@ -627,7 +628,27 @@ class JaxprToOnnx:
         self.nodes.append(node)
 
     def _handle_device_put(self, node_inputs, node_outputs, params):
-        input_names = [self._get_name(inp) for inp in node_inputs]
+        name = self._get_unique_name("const")
+        # Convert to numpy and create tensor
+        val = node_inputs[0]
+        actual_val = val.val
+        
+        np_val = np.array(actual_val)
+        if np_val.dtype == np.int64:
+            np_val = np_val.astype(np.int32)
+        elif np_val.dtype == np.float64:
+            np_val = np_val.astype(np.float32)
+        print("DEVICE PUT ", np_val, " ", np_val.dtype)
+
+        tensor = helper.make_tensor(
+            name=name,
+            data_type=self._numpy_dtype_to_onnx(np_val.dtype),
+            dims=np_val.shape,
+            vals=np_val.flatten().tolist(),
+        )
+        self.initializers.append(tensor)
+        # return name
+        input_names = [name]
         output_name = self._get_var_name(node_outputs[0])
 
         node = helper.make_node(
@@ -723,12 +744,7 @@ class JaxprToOnnx:
         """Process a JAXPR and convert it to ONNX nodes."""
         # Setup inputs
         for var in jaxpr.invars:
-            print(var)
-            print(var.aval.shape)
-            print(var.aval.dtype)
             self._add_input(var, var.aval.shape, var.aval.dtype)
-            print(self._get_name(var))
-            print()
         
         # Setup constants
         for i, const in enumerate(consts):
