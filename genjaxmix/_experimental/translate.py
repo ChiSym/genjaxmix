@@ -26,6 +26,7 @@ class JaxprToOnnx:
             jax.lax.mul_p: self._handle_mul,
             jax.lax.sub_p: self._handle_sub,
             jax.lax.div_p: self._handle_div,
+            jax.lax.ne_p: self._handle_ne,
             jax.lax.lt_p: self._handle_lt,
             jax.lax.max_p: self._handle_max,
             jax.lax.select_n_p: self._handle_select_n,
@@ -34,10 +35,12 @@ class JaxprToOnnx:
             jax.lax.reduce_max_p: self._handle_reduce_max,
             jax.lax.reduce_min_p: self._handle_reduce_min,
             jax.lax.scatter_add_p: self._handle_scatter_add, # TODO: CHANGE
+            jax.lax.square_p: self._handle_square,
             jax.lax.sqrt_p: self._handle_sqrt,
             jax.lax.exp_p: self._handle_exp,
             jax.lax.log_p: self._handle_log,
             jax.lax.tanh_p: self._handle_tanh,
+            jax.lax.iota_p: self._handle_iota,
             # jax.lax.sigmoid_p: self._handle_sigmoid,
             jax.lax.reshape_p: self._handle_reshape,
             jax.lax.transpose_p: self._handle_transpose,
@@ -209,6 +212,27 @@ class JaxprToOnnx:
         )
         self.nodes.append(node)
 
+    def _handle_ne(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        eq_output = self._get_unique_name("equal_output")
+        output_name = self._get_var_name(node_outputs[0])
+        node_1 = helper.make_node(
+            "Equal",
+            inputs = input_names,
+            outputs=[eq_output],
+            name=self._get_unique_name("ne_eq")
+        )
+        self.nodes.append(node_1)
+
+        node_2 = helper.make_node(
+            "Not",
+            inputs = eq_output,
+            outputs=[output_name],
+            name=self._get_unique_name("ne_not")
+        )
+        self.nodes.append(node_2)
+
+
     def _handle_lt(self, node_inputs, node_outputs, params):
         input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
@@ -342,6 +366,22 @@ class JaxprToOnnx:
 
         self.nodes.append(node)
 
+    def _handle_square(self, node_inputs, node_outputs, params):
+        """Handle JAX square primitive."""
+        input_name = self._get_name(node_inputs[0])
+        output_name = self._get_var_name(node_outputs[0])
+
+        power_name = self._get_constant_name(np.array(2, dtype=np.int32))
+
+        node = helper.make_node(
+            "Pow",
+            inputs = [input_name, power_name],
+            outputs = [output_name],
+            name = self._get_unique_name("Square")
+        )
+
+        self.nodes.append(node)
+
     def _handle_sqrt(self, node_inputs, node_outputs, params):
         """Handle JAX sqrt primitive."""
         input_name = self._get_name(node_inputs[0])
@@ -397,7 +437,7 @@ class JaxprToOnnx:
     
     def _handle_sigmoid(self, node_inputs, node_outputs, params):
         """Handle JAX sigmoid primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         node = helper.make_node(
@@ -405,6 +445,27 @@ class JaxprToOnnx:
             inputs=[input_name],
             outputs=[output_name],
             name=self._get_unique_name("sigmoid")
+        )
+        self.nodes.append(node)
+    
+    def _handle_iota(self, node_inputs, node_outputs, params):
+        """Handle JAX iota primitive."""
+        # input_name = self._get_name(node_inputs[0])
+        output_name = self._get_var_name(node_outputs[0])
+
+        dtype = params["dtype"]
+        shape = params["shape"]
+
+        L = shape[0] # TODO: consider when len(shape) > 1
+        start_name = self._get_constant_name(np.array(0, dtype=np.int32))
+        end_name = self._get_constant_name(np.array(L, dtype=np.int32))
+        step_name = self._get_constant_name(np.array(1, dtype=np.int32))
+        
+        node = helper.make_node(
+            "Range",
+            inputs=[start_name, end_name, step_name],
+            outputs=[output_name],
+            name=self._get_unique_name("iota")
         )
         self.nodes.append(node)
     
@@ -705,6 +766,8 @@ class JaxprToOnnx:
         elif name == "clip":
             self._process_closed_jaxpr(jaxpr)
         elif name == "sort":
+            self._process_closed_jaxpr(jaxpr)
+        elif name == "_where":
             self._process_closed_jaxpr(jaxpr)
         else:
             raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
