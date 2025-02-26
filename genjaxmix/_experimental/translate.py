@@ -1,4 +1,5 @@
 import jax
+from copy import deepcopy
 import jax.numpy as jnp
 import inspect
 import onnx
@@ -60,6 +61,10 @@ class JaxprToOnnx:
         """Get or create a name for a JAX variable."""
         if var not in self.var_to_name:
             self.var_to_name[var] = self._get_unique_name(f"var")
+            if self.var_to_name[var] == "var_26":
+                pass
+        if self.var_to_name[var] == "var_26":
+            pass
         return self.var_to_name[var]
     
     def _get_constant_name(self, val):
@@ -81,20 +86,24 @@ class JaxprToOnnx:
     
     def _numpy_dtype_to_onnx(self, dtype):
         """Convert numpy dtype to ONNX data type."""
-        dtype_map = {
-            np.float32: TensorProto.FLOAT,
-            np.float64: TensorProto.DOUBLE,
-            np.int32: TensorProto.INT32,
-            np.int64: TensorProto.INT64,
-            np.bool_: TensorProto.BOOL,
-        }
-        return dtype_map.get(dtype, TensorProto.FLOAT)
+        if dtype == np.float32:
+            return TensorProto.FLOAT
+        elif dtype == np.float64:
+            return TensorProto.DOUBLE
+        elif dtype == np.int32:
+            return TensorProto.INT32
+        elif dtype == np.int64:
+            return TensorProto.INT64
+        elif dtype == np.bool_:
+            return TensorProto.BOOL
+        else:
+            return TensorProto.FLOAT
     
     def _add_input(self, var, shape, dtype=np.float32):
         """Add an input to the ONNX model."""
         name = self._get_var_name(var)
         input_def = helper.make_tensor_value_info(
-            name, self._numpy_dtype_to_onnx(dtype), shape
+            name, self._numpy_dtype_to_onnx(type), shape
         )
         self.inputs.append(input_def)
         return name
@@ -637,7 +646,9 @@ class JaxprToOnnx:
         if name == "_normal":
             self._handle_random_normal(jaxpr.invars, jaxpr.outvars, jaxpr.params)
         elif name == "clip":
-            self._process_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts)
+            # print("CLIP")
+            self._process_closed_jaxpr(jaxpr)
+            # print("DONE PROCESSING CLIP")
         else:
             raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
 
@@ -656,6 +667,55 @@ class JaxprToOnnx:
         else:
             # Handle call primitives or other special cases
             raise NotImplementedError(f"Non-primitive equation: {jaxpr}")
+
+    def _process_closed_jaxpr(self, jaxpr): 
+        # TODO: CONFUSING, `jaxpr` is a JaxprEqn which contains the ClosedJaxpr
+        assert isinstance(jaxpr, jax._src.core.JaxprEqn)
+
+        closed_jaxpr = jaxpr.params["jaxpr"]
+        out_invars = jaxpr.invars
+        inner_invars = closed_jaxpr.jaxpr.invars
+
+        assert len(out_invars) == len(inner_invars)
+
+        # for each in/out var, connect with identity
+        for o_in, i_in in zip(out_invars, inner_invars):
+            input_name = self._get_name(o_in)
+            output_name = self._get_name(i_in)
+
+            node = helper.make_node(
+                "Identity",
+                inputs = [input_name],
+                outputs = [output_name],
+                name = self._get_unique_name("closed_jaxpr")
+            )
+            self.nodes.append(node)
+        
+        for i, const in enumerate(closed_jaxpr.consts):
+            const_name = self._get_constant_name(const)
+            const_var = closed_jaxpr.constvars[i]
+            self.var_to_name[const_var] = const_name
+            
+        for eqn in closed_jaxpr.eqns:
+            self._process_eqn(eqn)
+
+
+        inner_outvars = closed_jaxpr.jaxpr.outvars
+        out_outvars = jaxpr.outvars
+        assert len(inner_outvars) == len(out_outvars)
+
+        for i_out, o_out in zip(inner_outvars, out_outvars):
+            input_name = self._get_name(i_out)
+            output_name = self._get_name(o_out)
+
+            node = helper.make_node(
+                "Identity",
+                inputs = [input_name],
+                outputs = [output_name],
+                name = self._get_unique_name("closed_jaxpr")
+            )
+            self.nodes.append(node)
+
     
     def _process_jaxpr(self, jaxpr, consts):
         """Process a JAXPR and convert it to ONNX nodes."""
