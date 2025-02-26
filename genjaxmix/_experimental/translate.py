@@ -1,12 +1,9 @@
 import jax
-from copy import deepcopy
 import jax.numpy as jnp
-import inspect
 import onnx
 from onnx import helper, TensorProto
 import numpy as np
 from typing import Dict, List, Tuple, Any, Set, Optional
-import inspect
 
 class JaxprToOnnx:
     """
@@ -35,6 +32,8 @@ class JaxprToOnnx:
             jax.lax.reduce_max_p: self._handle_reduce_max,
             jax.lax.reduce_min_p: self._handle_reduce_min,
             jax.lax.scatter_add_p: self._handle_scatter_add, # TODO: CHANGE
+            jax.lax.argmax_p: self._handle_argmax,
+            jax.lax.argmin_p: self._handle_argmin,
             jax.lax.square_p: self._handle_square,
             jax.lax.sqrt_p: self._handle_sqrt,
             jax.lax.exp_p: self._handle_exp,
@@ -226,7 +225,7 @@ class JaxprToOnnx:
 
         node_2 = helper.make_node(
             "Not",
-            inputs = eq_output,
+            inputs = [eq_output],
             outputs=[output_name],
             name=self._get_unique_name("ne_not")
         )
@@ -366,6 +365,45 @@ class JaxprToOnnx:
 
         self.nodes.append(node)
 
+    def _handle_argmax(self, node_inputs, node_outputs, params):
+        """Handle JAX argmax primitive."""
+        input_name = self._get_name(node_inputs[0])
+        output_name = self._get_var_name(node_outputs[0])
+
+        axes = params["axes"]
+        index_dtype = params["index_dtype"]
+        keepdims = 1 if "keepdims" in params else 0
+
+        node = helper.make_node(
+            "ArgMax",
+            inputs = [input_name],
+            outputs = [output_name],
+            name = self._get_unique_name("argmax"),
+            axes=axes,
+            keepdims = keepdims
+        )
+
+        self.nodes.append(node)
+
+    def _handle_argmin(self, node_inputs, node_outputs, params):
+        """Handle JAX argmin primitive."""
+        input_name = self._get_name(node_inputs[0])
+        output_name = self._get_var_name(node_outputs[0])
+
+        axes = params["axes"]
+        index_dtype = params["index_dtype"]
+        keepdims = params["keepdims"]
+        node = helper.make_node(
+            "ArgMin",
+            inputs = [input_name],
+            outputs = [output_name],
+            name = self._get_unique_name("argmin"),
+            axes=axes,
+            keepdims = keepdims
+        )
+
+        self.nodes.append(node)
+
     def _handle_square(self, node_inputs, node_outputs, params):
         """Handle JAX square primitive."""
         input_name = self._get_name(node_inputs[0])
@@ -377,7 +415,7 @@ class JaxprToOnnx:
             "Pow",
             inputs = [input_name, power_name],
             outputs = [output_name],
-            name = self._get_unique_name("Square")
+            name = self._get_unique_name("square")
         )
 
         self.nodes.append(node)
