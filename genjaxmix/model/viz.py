@@ -1,9 +1,9 @@
-import genjaxmix.model.compile as compile
+import genjaxmix.model as mm
 import genjaxmix.model.dsl as dsl
 from graphviz import Digraph
 
 
-def visualize(model: compile.Model):
+def visualize(model: mm.Model):
     dot = Digraph()
 
     def pretty_print(i):

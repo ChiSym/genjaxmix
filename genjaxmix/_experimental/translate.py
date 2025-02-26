@@ -24,11 +24,14 @@ class JaxprToOnnx:
             jax.lax.mul_p: self._handle_mul,
             jax.lax.sub_p: self._handle_sub,
             jax.lax.div_p: self._handle_div,
+            jax.lax.lt_p: self._handle_lt,
             jax.lax.max_p: self._handle_max,
+            jax.lax.select_n_p: self._handle_select_n,
             jax.lax.dot_general_p: self._handle_dot_general,
             jax.lax.reduce_sum_p: self._handle_reduce_sum,
             jax.lax.reduce_max_p: self._handle_reduce_max,
             jax.lax.reduce_min_p: self._handle_reduce_min,
+            jax.lax.scatter_add_p: self._handle_scatter_add, # TODO: CHANGE
             jax.lax.sqrt_p: self._handle_sqrt,
             jax.lax.exp_p: self._handle_exp,
             jax.lax.log_p: self._handle_log,
@@ -41,8 +44,10 @@ class JaxprToOnnx:
             jax.lax.concatenate_p: self._handle_concatenate,
             jax.lax.conv_general_dilated_p: self._handle_conv,
             jax.lax.stop_gradient_p: self._handle_identity,
-            jax._src.prng.random_seed_p: None, # TODO: Implement
+            jax._src.prng.random_seed_p: None, # TODO: CHANGE
             jax._src.prng.random_wrap_p: self._handle_identity, # TODO: CHANGE
+            jax.lax.convert_element_type_p: self._handle_convert_element_type, # TODO: CHANGE
+            jax.lax.device_put_p: self._handle_device_put, # TODO: CHANGE
         }
     
     def _get_unique_name(self, prefix="node"):
@@ -53,7 +58,6 @@ class JaxprToOnnx:
     
     def _get_var_name(self, var):
         """Get or create a name for a JAX variable."""
-        print("VAR ", var, " ", type(var))
         if var not in self.var_to_name:
             self.var_to_name[var] = self._get_unique_name(f"var")
         return self.var_to_name[var]
@@ -63,7 +67,6 @@ class JaxprToOnnx:
         name = self._get_unique_name("const")
         # Convert to numpy and create tensor
         if isinstance(val, jax._src.core.Literal):
-            print("get constant name ", val.val, " ", type(val))
             np_val = np.array(val.val)
         else:
             np_val = np.array(val)
@@ -120,7 +123,6 @@ class JaxprToOnnx:
         elif isinstance(var, jax._src.core.Literal):
             return self._get_constant_name(var)
         else:
-            print("What is this")
             raise NotImplementedError("not yet implemented")
 
     def _handle_identity(self, node_inputs, node_outputs, params):
@@ -182,6 +184,17 @@ class JaxprToOnnx:
             name=self._get_unique_name("div")
         )
         self.nodes.append(node)
+
+    def _handle_lt(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Less",
+            inputs = input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("less")
+        )
+        self.nodes.append(node)
     
     def _handle_max(self, node_inputs, node_outputs, params):
         """Handle JAX max primitive."""
@@ -195,6 +208,19 @@ class JaxprToOnnx:
             name=self._get_unique_name("max")
         )
         self.nodes.append(node)
+
+    def _handle_select_n(self, node_inputs, node_outputs, params):
+        """Handle JAX select_n primitive."""
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Where",
+            inputs=input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("where")
+        )
+        self.nodes.append(node)
+
     
     def _handle_dot_general(self, node_inputs, node_outputs, params):
         """Handle JAX dot_general primitive."""
@@ -222,8 +248,6 @@ class JaxprToOnnx:
             )
     
     def _handle_reduce_sum(self, node_inputs, node_outputs, params):
-        print("reduce sum...")
-        print("params ", params)
         """Handle JAX reduce_sum primitive."""
         input_name = self._get_var_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
@@ -243,7 +267,6 @@ class JaxprToOnnx:
         self.nodes.append(node)
     
     def _handle_reduce_max(self, node_inputs, node_outputs, params):
-        print("params for max ", params)
         """Handle JAX reduce_max primitive."""
         input_name = self._get_var_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
@@ -279,6 +302,19 @@ class JaxprToOnnx:
             name=self._get_unique_name("reduce_min"),
             keepdims=0 if not params.get("keepdims", False) else 1
         )
+        self.nodes.append(node)
+
+    def _handle_scatter_add(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(imp) for imp in node_inputs]
+        output_name = self._get_var_name(node_inputs[0])
+
+        node = helper.make_node(
+            "Scatter",
+            inputs = input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("scatter_add")
+        )
+
         self.nodes.append(node)
 
     def _handle_sqrt(self, node_inputs, node_outputs, params):
@@ -550,40 +586,65 @@ class JaxprToOnnx:
         self.nodes.append(node)
 
     def _handle_random_wrap(self, node_inputs, node_outputs, params):
-        print("IN RANDOM WRAP")
-        pass
+        raise NotImplementedError("_handle_random_wrap")
+
+    def _handle_random_normal(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        shape = node_outputs[0].aval.shape
+        if shape == ():
+            shape = None
+        node = helper.make_node(
+            "RandomNormal",
+            inputs = [],
+            outputs = [output_name],
+            name=self._get_unique_name("random_normal"),
+            shape=(1,)
+        )
+        self.nodes.append(node)
+
+    def _handle_convert_element_type(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])   
+
+        node = helper.make_node(
+            "Identity",
+            inputs = input_names,
+            outputs = [output_name],
+            name = self._get_unique_name("ident/stop_gradient")
+        )
+        self.nodes.append(node)
+
+    def _handle_device_put(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+
+        node = helper.make_node(
+            "Identity",
+            inputs = input_names,
+            outputs = [output_name],
+            name = self._get_unique_name("ident/stop_gradient")
+        )
+        self.nodes.append(node)
+    
     
     def _process_pjit(self, jaxpr):
-        print("Handling pjit call")
         closed_jaxpr = jaxpr.params["jaxpr"]
         if not isinstance(closed_jaxpr, jax._src.core.ClosedJaxpr):
             raise ValueError("Expected ClosedJaxpr in pjit.param[jaxpr]")
         
+        name = jaxpr.params["name"]
         if jaxpr.params["name"] == "_normal":
-            def _handle_random_normal(node_inputs, node_outputs, params):
-                input_names = [self._get_name(inp) for inp in node_inputs]
-                output_name = self._get_var_name(node_outputs[0])
-                shape = node_outputs[0].aval.shape
-                if shape == ():
-                    shape = None
-                node = helper.make_node(
-                    "RandomNormal",
-                    inputs = [],
-                    outputs = [output_name],
-                    name=self._get_unique_name("random_normal"),
-                    shape=(1,)
-                )
-                self.nodes.append(node)
-            _handle_random_normal(jaxpr.invars, jaxpr.outvars, jaxpr.params)
+            self._handle_random_normal(jaxpr.invars, jaxpr.outvars, jaxpr.params)
+        elif jaxpr.params["name"] == "clip":
+            self._process_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts)
+        else:
+            raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
 
-        # print(closed_jaxpr)
-        # self._process_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts)
-    
     def _process_eqn(self, jaxpr):
         """Process a single JAXPR equation."""
         if hasattr(jaxpr, "primitive"):
             primitive = jaxpr.primitive
-            print("process_eqn ", primitive, " ", type(primitive), " ", primitive.impl)
             if primitive.name == "pjit":
                 self._process_pjit(jaxpr)
             elif primitive in self.primitive_handlers:
