@@ -368,41 +368,66 @@ class JaxprToOnnx:
     def _handle_argmax(self, node_inputs, node_outputs, params):
         """Handle JAX argmax primitive."""
         input_name = self._get_name(node_inputs[0])
+        intermediate_name = self._get_unique_name("argmax_intermediate")
         output_name = self._get_var_name(node_outputs[0])
 
-        axes = params["axes"]
+        axis = params["axes"][0]
         index_dtype = params["index_dtype"]
         keepdims = 1 if "keepdims" in params else 0
 
-        node = helper.make_node(
+        node_1 = helper.make_node(
             "ArgMax",
             inputs = [input_name],
-            outputs = [output_name],
+            outputs = [intermediate_name],
             name = self._get_unique_name("argmax"),
-            axes=axes,
+            axis=axis,
             keepdims = keepdims
         )
+        self.nodes.append(node_1)
 
-        self.nodes.append(node)
+        # Slight quirk in ONNX: argmax returns int64, but we can always(?) cast to int32.
+
+        node_2 = helper.make_node(
+            "Cast",
+            inputs = [intermediate_name],
+            outputs  = [output_name],
+            to = TensorProto.INT32
+        )
+        self.nodes.append(node_2)
+
+
+
 
     def _handle_argmin(self, node_inputs, node_outputs, params):
         """Handle JAX argmin primitive."""
         input_name = self._get_name(node_inputs[0])
+        intermediate_name = self._get_unique_name("argmax_intermediate")
         output_name = self._get_var_name(node_outputs[0])
 
-        axes = params["axes"]
+        axis = params["axes"][0]
         index_dtype = params["index_dtype"]
         keepdims = params["keepdims"]
-        node = helper.make_node(
+        node_1 = helper.make_node(
             "ArgMin",
             inputs = [input_name],
-            outputs = [output_name],
+            outputs = [intermediate_name],
             name = self._get_unique_name("argmin"),
-            axes=axes,
+            axis=axis,
             keepdims = keepdims
         )
 
-        self.nodes.append(node)
+        self.nodes.append(node_1)
+
+        # Slight quirk in ONNX: argmin returns int64, but we can always(?) cast to int32.
+
+        node_2 = helper.make_node(
+            "Cast",
+            inputs = [intermediate_name],
+            outputs  = [output_name],
+            to = TensorProto.INT32
+        )
+        self.nodes.append(node_2)
+
 
     def _handle_square(self, node_inputs, node_outputs, params):
         """Handle JAX square primitive."""
@@ -717,13 +742,22 @@ class JaxprToOnnx:
         self.nodes.append(node)
 
     def _handle_sort(self, node_inputs, node_outputs, params):
-        input_names = [self._get_name(imp) for imp in node_inputs]
-        output_name = self._get_var_name(node_outputs[0])
+        input_name = self._get_name(node_inputs[0]) 
+        value_name = self._get_var_name(node_outputs[0])
+        indices_name = self._get_unique_name("sort_indices_output")
 
+        if "axis" in params:
+            axis = params["axis"]
+            K = node_inputs[0].aval.shape[axis]
+            raise NotImplementedError("sort axis not supported yet")
+        else:
+            K = node_inputs[0].aval.shape[0]
+        
+        K_name = self._get_constant_name(np.array([K], dtype=np.int64))
         node = helper.make_node(
             "TopK",
-            inputs = input_names,
-            outputs=[output_name],
+            inputs = [input_name, K_name],
+            outputs=[value_name, indices_name],
             name=self._get_unique_name("sort"),
             largest = 0
         )
