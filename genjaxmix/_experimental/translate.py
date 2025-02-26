@@ -21,6 +21,7 @@ class JaxprToOnnx:
         self.name_counter = 0
         self.var_to_name: Dict[Any, str] = {}
         self.primitive_handlers = {
+            jax.lax.neg_p: self._handle_neg,
             jax.lax.add_p: self._handle_add,
             jax.lax.mul_p: self._handle_mul,
             jax.lax.sub_p: self._handle_sub,
@@ -145,6 +146,19 @@ class JaxprToOnnx:
             name = self._get_unique_name("ident/stop_gradient")
         )
         self.nodes.append(node)
+
+    def _handle_neg(self, node_inputs, node_outputs, params):
+        """Handle JAX neg primitive."""
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Neg",
+            inputs=input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("neg")
+        )
+        self.nodes.append(node)
+        
     
     def _handle_add(self, node_inputs, node_outputs, params):
         """Handle JAX add primitive."""
