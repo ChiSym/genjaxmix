@@ -24,9 +24,8 @@ def topological_sort(graph):
     return ordering
 
 
-def count_unique(array):
+def count_unique(arr):
     # Sort the array first
-    sorted_arr = jnp.sort(array)
+    sorted_arr = jnp.sort(arr)
     # Compare adjacent elements to find unique transitions
-    # Add 1 to account for the first element
-    return jnp.sum(jnp.concatenate([jnp.array([1]), sorted_arr[1:] != sorted_arr[:-1]]))
+    return jnp.sum(sorted_arr[1:] != sorted_arr[:-1])+1

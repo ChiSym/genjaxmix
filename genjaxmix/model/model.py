@@ -189,7 +189,7 @@ class Model(ABC):
         def assignment_proposal(key, environment, pi, assignments):
             K = count_unique(assignments)
             K_max = pi.shape[0]
-            log_p = jnp.zeros(pi.shape[0])
+            log_p = jnp.zeros(K_max)
             for id in latent_likelihoods.keys():
                 log_p += latent_likelihoods[id](environment)
 
