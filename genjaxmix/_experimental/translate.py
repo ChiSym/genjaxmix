@@ -306,7 +306,7 @@ class JaxprToOnnx:
 
     def _handle_scatter_add(self, node_inputs, node_outputs, params):
         input_names = [self._get_name(imp) for imp in node_inputs]
-        output_name = self._get_var_name(node_inputs[0])
+        output_name = self._get_var_name(node_outputs[0])
 
         node = helper.make_node(
             "Scatter",
@@ -634,9 +634,9 @@ class JaxprToOnnx:
             raise ValueError("Expected ClosedJaxpr in pjit.param[jaxpr]")
         
         name = jaxpr.params["name"]
-        if jaxpr.params["name"] == "_normal":
+        if name == "_normal":
             self._handle_random_normal(jaxpr.invars, jaxpr.outvars, jaxpr.params)
-        elif jaxpr.params["name"] == "clip":
+        elif name == "clip":
             self._process_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts)
         else:
             raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
