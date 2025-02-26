@@ -46,6 +46,7 @@ class JaxprToOnnx:
             jax.lax.concatenate_p: self._handle_concatenate,
             jax.lax.conv_general_dilated_p: self._handle_conv,
             jax.lax.stop_gradient_p: self._handle_identity,
+            jax.lax.sort_p: self._handle_sort,
             jax._src.prng.random_seed_p: None, # TODO: CHANGE
             jax._src.prng.random_wrap_p: self._handle_identity, # TODO: CHANGE
             jax.lax.convert_element_type_p: self._handle_convert_element_type, # TODO: CHANGE
@@ -357,7 +358,7 @@ class JaxprToOnnx:
     
     def _handle_exp(self, node_inputs, node_outputs, params):
         """Handle JAX exp primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         node = helper.make_node(
@@ -370,7 +371,7 @@ class JaxprToOnnx:
     
     def _handle_log(self, node_inputs, node_outputs, params):
         """Handle JAX log primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         node = helper.make_node(
@@ -490,24 +491,29 @@ class JaxprToOnnx:
     
     def _handle_slice(self, node_inputs, node_outputs, params):
         """Handle JAX slice primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Get slice parameters
         start_indices = params["start_indices"]
-        limit_indices = params["limit_indices"]
-        strides = params["strides"] if "strides" in params else [1] * len(start_indices)
-        
-        # Create constants for ONNX Slice op
         starts_name = self._get_constant_name(np.array(start_indices, dtype=np.int64))
+        limit_indices = params["limit_indices"]
         ends_name = self._get_constant_name(np.array(limit_indices, dtype=np.int64))
         axes_name = self._get_constant_name(np.array(list(range(len(start_indices))), dtype=np.int64))
-        steps_name = self._get_constant_name(np.array(strides, dtype=np.int64))
+        inputs = [input_name, starts_name, ends_name, axes_name]
+
+        if "strides" in params and params["strides"]:
+            # Create constants for ONNX Slice op
+            # strides = params["strides"] if "strides" in params else [1] * len(start_indices)
+            strides = params["strides"] 
+            steps_name = self._get_constant_name(np.array(strides, dtype=np.int64))
+            inputs.append(steps_name)
+        
         
         # Create Slice node
         node = helper.make_node(
             "Slice",
-            inputs=[input_name, starts_name, ends_name, axes_name, steps_name],
+            inputs=inputs,
             outputs=[output_name],
             name=self._get_unique_name("slice")
         )
@@ -609,6 +615,20 @@ class JaxprToOnnx:
         )
         self.nodes.append(node)
 
+    def _handle_sort(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(imp) for imp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+
+        node = helper.make_node(
+            "TopK",
+            inputs = input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("sort"),
+            largest = 0
+        )
+
+        self.nodes.append(node)
+
     def _handle_random_wrap(self, node_inputs, node_outputs, params):
         raise NotImplementedError("_handle_random_wrap")
 
@@ -683,9 +703,9 @@ class JaxprToOnnx:
         if name == "_normal":
             self._handle_random_normal(jaxpr.invars, jaxpr.outvars, jaxpr.params)
         elif name == "clip":
-            # print("CLIP")
             self._process_closed_jaxpr(jaxpr)
-            # print("DONE PROCESSING CLIP")
+        elif name == "sort":
+            self._process_closed_jaxpr(jaxpr)
         else:
             raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
 
