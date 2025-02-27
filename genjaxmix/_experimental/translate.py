@@ -891,8 +891,6 @@ class JaxprToOnnx:
             self.nodes.append(node)
         
         # to make sort more generic, we first find the shape
-        
-        # K_name = self._get_constant_name(np.array([K], dtype=np.int64))
         node = helper.make_node(
             "TopK",
             inputs = [input_name, shape_name],
@@ -962,7 +960,7 @@ class JaxprToOnnx:
         key = jax.random.key(0)
         alpha = jnp.zeros(shape)
 
-        # TODO: Dumb but we need to know how many nodes there are first
+        # TODO: Case 0 < alpha <= 1/3 not handled
         subconverter = JaxprToOnnx(self.name_counter + 1)
         if "log_space" in params and params["log_space"]:
             subconverter.trace_jaxpr(gamma_log, (key, alpha))
@@ -1097,49 +1095,47 @@ class JaxprToOnnx:
         assert isinstance(jaxpr, jax._src.core.JaxprEqn)
 
         closed_jaxpr = jaxpr.params["jaxpr"]
-        out_invars = jaxpr.invars
-        inner_invars = closed_jaxpr.jaxpr.invars
+        node_inputs = jaxpr.invars
+        node_outputs = jaxpr.outvars
 
-        assert len(out_invars) == len(inner_invars)
+        subconverter = JaxprToOnnx(self.name_counter + 1)
+        subconverter._process_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts)
 
-        # for each in/out var, connect with identity
-        for o_in, i_in in zip(out_invars, inner_invars):
-            input_name = self._get_name(o_in)
-            output_name = self._get_name(i_in)
 
+        nodes = subconverter.nodes
+        initializers = subconverter.initializers
+        inputs = subconverter.inputs
+        outputs = subconverter.outputs
+
+        assert len(node_inputs) == len(inputs)
+        assert len(node_outputs) == len(outputs)
+
+
+        for o_invar, i_invar in zip(node_inputs, inputs):
+            o_invar_name = self._get_name(o_invar)
+            i_invar_name = i_invar.name
             node = helper.make_node(
                 "Identity",
-                inputs = [input_name],
-                outputs = [output_name],
-                name = self._get_unique_name("closed_jaxpr")
-            )
-            self.nodes.append(node)
-        
-        for i, const in enumerate(closed_jaxpr.consts):
-            const_name = self._get_constant_name(const)
-            const_var = closed_jaxpr.constvars[i]
-            self.var_to_name[const_var] = const_name
-            
-        for eqn in closed_jaxpr.eqns:
-            self._process_eqn(eqn)
-
-
-        inner_outvars = closed_jaxpr.jaxpr.outvars
-        out_outvars = jaxpr.outvars
-        assert len(inner_outvars) == len(out_outvars)
-
-        for i_out, o_out in zip(inner_outvars, out_outvars):
-            input_name = self._get_name(i_out)
-            output_name = self._get_name(o_out)
-
-            node = helper.make_node(
-                "Identity",
-                inputs = [input_name],
-                outputs = [output_name],
-                name = self._get_unique_name("closed_jaxpr")
+                inputs = [o_invar_name],
+                outputs = [i_invar_name],
+                name = self._get_unique_name("pjit_input")
             )
             self.nodes.append(node)
 
+        self.nodes += nodes
+        self.initializers += initializers
+        self.name_counter += (subconverter.name_counter - subconverter._name_counter_init)
+
+        for o_outvar, i_outvar in zip(node_outputs, outputs):
+            o_outvar_name = self._get_name(o_outvar)
+            i_outvar_name = i_outvar.name
+            node = helper.make_node(
+                "Identity",
+                inputs = [i_outvar_name],
+                outputs = [o_outvar_name],
+                name = self._get_unique_name("pjit_output")
+            )
+            self.nodes.append(node)
     
     def _process_jaxpr(self, jaxpr, consts):
         """Process a JAXPR and convert it to ONNX nodes."""
