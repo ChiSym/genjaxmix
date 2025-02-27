@@ -9,22 +9,28 @@ class JaxprToOnnx:
     """
     A translator that converts JAX's JAXPR representation to ONNX format.
     """
-    def __init__(self):
+    def __init__(self, name_counter=0):
         self.nodes = []
         self.inputs = []
         self.outputs = []
         self.initializers = []
         self.value_info = []
-        self.name_counter = 0
+        self._name_counter_init = name_counter
+        self.name_counter = name_counter
         self.var_to_name: Dict[Any, str] = {}
         self.primitive_handlers = {
             jax.lax.neg_p: self._handle_neg,
+            jax.lax.not_p: self._handle_not,
             jax.lax.add_p: self._handle_add,
             jax.lax.mul_p: self._handle_mul,
             jax.lax.sub_p: self._handle_sub,
             jax.lax.div_p: self._handle_div,
+            jax.lax.and_p: self._handle_and,
+            jax.lax.or_p: self._handle_or,
+            jax.lax.xor_p: self._handle_xor,
             jax.lax.ne_p: self._handle_ne,
             jax.lax.lt_p: self._handle_lt,
+            jax.lax.gt_p: self._handle_gt,
             jax.lax.max_p: self._handle_max,
             jax.lax.min_p: self._handle_min,
             jax.lax.select_n_p: self._handle_select_n,
@@ -37,6 +43,7 @@ class JaxprToOnnx:
             jax.lax.argmax_p: self._handle_argmax,
             jax.lax.argmin_p: self._handle_argmin,
             jax.lax.square_p: self._handle_square,
+            jax.lax.integer_pow_p: self._handle_integer_pow,
             jax.lax.sqrt_p: self._handle_sqrt,
             jax.lax.exp_p: self._handle_exp,
             jax.lax.log_p: self._handle_log,
@@ -55,6 +62,7 @@ class JaxprToOnnx:
             jax._src.prng.random_wrap_p: self._handle_identity, # TODO: CHANGE
             jax.lax.convert_element_type_p: self._handle_convert_element_type, # TODO: CHANGE
             jax.lax.device_put_p: self._handle_device_put, # TODO: CHANGE
+            jax.random.random_gamma_p: self._handle_random_gamma,
         }
     
     def _get_unique_name(self, prefix="node"):
@@ -163,6 +171,18 @@ class JaxprToOnnx:
             name=self._get_unique_name("neg")
         )
         self.nodes.append(node)
+
+    def _handle_not(self, node_inputs, node_outputs, params):
+        """Handle JAX not primitive."""
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Not",
+            inputs=input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("not")
+        )
+        self.nodes.append(node)
         
     
     def _handle_add(self, node_inputs, node_outputs, params):
@@ -233,6 +253,42 @@ class JaxprToOnnx:
         )
         self.nodes.append(node_2)
 
+    def _handle_and(self, node_inputs, node_outputs, params):
+        """Handle JAX and primitive."""
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "And",
+            inputs=input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("and")
+        )
+        self.nodes.append(node)
+
+    def _handle_or(self, node_inputs, node_outputs, params):
+        """Handle JAX or primitive."""
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Or",
+            inputs=input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("or")
+        )
+        self.nodes.append(node)
+
+    def _handle_xor(self, node_inputs, node_outputs, params):
+        """Handle JAX xor primitive."""
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Xor",
+            inputs=input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("xor")
+        )
+        self.nodes.append(node)
+
 
     def _handle_lt(self, node_inputs, node_outputs, params):
         input_names = [self._get_name(inp) for inp in node_inputs]
@@ -242,6 +298,17 @@ class JaxprToOnnx:
             inputs = input_names,
             outputs=[output_name],
             name=self._get_unique_name("less")
+        )
+        self.nodes.append(node)
+
+    def _handle_gt(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Greater",
+            inputs = input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("greater")
         )
         self.nodes.append(node)
     
@@ -473,6 +540,23 @@ class JaxprToOnnx:
         )
 
         self.nodes.append(node)
+    
+    def _handle_integer_pow(self, node_inputs, node_outputs, params):
+        """Handle JAX integer pow primitive."""
+        input_name = self._get_name(node_inputs[0])
+        output_name = self._get_var_name(node_outputs[0])
+
+        power_name = self._get_constant_name(np.array(params['y'], dtype=np.int32))
+
+        node = helper.make_node(
+            "Pow",
+            inputs = [input_name, power_name],
+            outputs = [output_name],
+            name = self._get_unique_name("square")
+        )
+
+        self.nodes.append(node)
+
 
     def _handle_sqrt(self, node_inputs, node_outputs, params):
         """Handle JAX sqrt primitive."""
@@ -825,7 +909,64 @@ class JaxprToOnnx:
             shape=shape
         )
         self.nodes.append(node)
+    
+    def _handle_random_gamma(self, node_inputs, node_outputs, params):
+        """
+        between Marsaglia-Tang and Cheng, we decided on the former due to the low rejection rate
+        https://kth.diva-portal.org/smash/get/diva2:1935824/FULLTEXT02.pdf
 
+        d = α - 1/3
+        c = 1/sqrt(9d)
+
+        repeat
+            sample Z ~ Normal(0,1)
+            V = (1 + cZ)^3
+            sample U ~ Uniform(0,1)
+            X = dV
+            if V > 0 and log(U) < 1/2 Z^2 + d - dV + dlog(V) then
+                accept X
+            endif
+
+        until X is accepted
+        return X
+        """
+        # Idea: Create a jaxpr for this and run JaxprToOnnx rather than doing it by hand
+        def gamma(key, alpha):
+            d = alpha - 1/3
+            c = 1 / jnp.sqrt(9 * d)
+            z = jax.random.normal(key)
+            v = (1+c*z)**3
+            u = jax.random.uniform(key)
+            x = d * v
+
+            acceptance = v > 0 and jnp.log(u) < 0.5 * z**2 + d - d*v + d * jnp.log(v)
+
+            z = jax.random.normal(key)
+            v = (1+c*z)**3
+            u = jax.random.uniform(key)
+            x = jnp.where(acceptance, x, d * v)
+
+        shape = node_inputs[1].aval.shape
+        key = jax.random.key(0)
+        alpha = jnp.zeros(shape)
+        gamma_jaxpr = jax.make_jaxpr(gamma)(key, alpha)
+        print(gamma_jaxpr)
+
+
+        # output_name = self._get_var_name(node_outputs[0])
+        # shape = node_outputs[0].aval.shape
+
+        # one_third = self._get_constant_name(np.array([1/3], dtype=np.float32))
+
+        # c_node = helper.make_node(
+        #     "Sub",
+        #     inputs = [alpha, one_third],
+        #     outputs = [output_name],
+        #     name=self._get_unique_name("gamma_sub"),
+        # )
+
+        # self.nodes.append(c_node)
+        
     def _handle_convert_element_type(self, node_inputs, node_outputs, params):
         input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])   
@@ -889,6 +1030,10 @@ class JaxprToOnnx:
         elif name == "_where":
             self._process_closed_jaxpr(jaxpr)
         elif name == "_gumbel":
+            self._process_closed_jaxpr(jaxpr)
+        elif name == "_dirichlet":
+            self._process_closed_jaxpr(jaxpr)
+        elif name == "_gamma":
             self._process_closed_jaxpr(jaxpr)
         else:
             raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
@@ -978,7 +1123,23 @@ class JaxprToOnnx:
         for var in jaxpr.outvars:
             self._add_output(var, var.aval.shape, var.aval.dtype)
     
-    def convert(self, fn, example_args, output_path='model.onnx'):
+    def trace_jaxpr(self, fn, example_args):
+        # Reset state
+        self.nodes = []
+        self.inputs = []
+        self.outputs = []
+        self.initializers = []
+        self.value_info = []
+        self.name_counter = self._name_counter_init
+        self.var_to_name = {}
+
+        # Get JAXPR from the function
+        closed_jaxpr = jax.make_jaxpr(fn)(*example_args)
+        jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.consts
+        
+        self._process_jaxpr(jaxpr, consts)
+
+    def convert(self, fn, example_args, output_path='model.onnx', model_name = "jax_model"):
         """
         Convert a JAX function to ONNX.
         
@@ -990,26 +1151,11 @@ class JaxprToOnnx:
         Returns:
             Path to the saved ONNX model
         """
-        # Reset state
-        self.nodes = []
-        self.inputs = []
-        self.outputs = []
-        self.initializers = []
-        self.value_info = []
-        self.name_counter = 0
-        self.var_to_name = {}
-        
-        # Get JAXPR from the function
-        closed_jaxpr = jax.make_jaxpr(fn)(*example_args)
-        jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.consts
-        
-        # Process the JAXPR
-        self._process_jaxpr(jaxpr, consts)
-        
-        # Create ONNX graph
+        self.trace_jaxpr(fn, example_args)
+                
         graph = helper.make_graph(
             nodes=self.nodes,
-            name="jax_model",
+            name=model_name,
             inputs=self.inputs,
             outputs=self.outputs,
             initializer=self.initializers,
