@@ -28,6 +28,7 @@ class JaxprToOnnx:
             jax.lax.and_p: self._handle_and,
             jax.lax.or_p: self._handle_or,
             jax.lax.xor_p: self._handle_xor,
+            jax.lax.eq_p: self._handle_eq,
             jax.lax.ne_p: self._handle_ne,
             jax.lax.lt_p: self._handle_lt,
             jax.lax.gt_p: self._handle_gt,
@@ -236,6 +237,17 @@ class JaxprToOnnx:
         )
         self.nodes.append(node)
 
+    def _handle_eq(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+        node = helper.make_node(
+            "Equal",
+            inputs = input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("eq")
+        )
+        self.nodes.append(node)
+
     def _handle_ne(self, node_inputs, node_outputs, params):
         input_names = [self._get_name(inp) for inp in node_inputs]
         eq_output = self._get_unique_name("equal_output")
@@ -343,11 +355,13 @@ class JaxprToOnnx:
 
     def _handle_select_n(self, node_inputs, node_outputs, params):
         """Handle JAX select_n primitive."""
-        input_names = [self._get_name(inp) for inp in node_inputs]
+        condition_name = self._get_name(node_inputs[0])
+        false_name = self._get_name(node_inputs[1])
+        true_name = self._get_name(node_inputs[2])
         output_name = self._get_var_name(node_outputs[0])
         node = helper.make_node(
             "Where",
-            inputs=input_names,
+            inputs=[condition_name, true_name, false_name],
             outputs=[output_name],
             name=self._get_unique_name("where")
         )
@@ -950,7 +964,10 @@ class JaxprToOnnx:
 
         # TODO: Dumb but we need to know how many nodes there are first
         subconverter = JaxprToOnnx(self.name_counter + 1)
-        subconverter.trace_jaxpr(gamma, (key, alpha))
+        if "log_space" in params and params["log_space"]:
+            subconverter.trace_jaxpr(gamma_log, (key, alpha))
+        else:
+            subconverter.trace_jaxpr(gamma, (key, alpha))
 
         # connect inputs/outputs to outer jaxpr
         nodes = subconverter.nodes
@@ -1225,7 +1242,15 @@ def gamma(key, alpha):
     v = (1+c*z)**3
     x = jnp.where(acceptance, x, d * v)
 
+    # clip when alpha = 0
+    x = jnp.where(alpha == 0, 0.0, x)
+
     return x
+
+def gamma_log(key, alpha):
+    x = gamma(key, alpha)
+    return jnp.log(x)
+
 # More complex example
 # def complex_example():
     # Define a small CNN
