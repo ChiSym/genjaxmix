@@ -930,43 +930,67 @@ class JaxprToOnnx:
         until X is accepted
         return X
         """
-        # Idea: Create a jaxpr for this and run JaxprToOnnx rather than doing it by hand
+        # Create a jaxpr and run JaxprToOnnx to build the CG
         def gamma(key, alpha):
             d = alpha - 1/3
             c = 1 / jnp.sqrt(9 * d)
-            z = jax.random.normal(key)
+            z = jax.random.normal(key, alpha.shape)
             v = (1+c*z)**3
-            u = jax.random.uniform(key)
+            u = jax.random.uniform(key, alpha.shape)
             x = d * v
 
-            acceptance = v > 0 and jnp.log(u) < 0.5 * z**2 + d - d*v + d * jnp.log(v)
+            acceptance = (v > 0) & (jnp.log(u) < (0.5 * z**2 + d - d*v + d * jnp.log(v)))
 
             z = jax.random.normal(key)
             v = (1+c*z)**3
-            u = jax.random.uniform(key)
             x = jnp.where(acceptance, x, d * v)
+
+            return x
 
         shape = node_inputs[1].aval.shape
         key = jax.random.key(0)
         alpha = jnp.zeros(shape)
-        gamma_jaxpr = jax.make_jaxpr(gamma)(key, alpha)
-        print(gamma_jaxpr)
+
+        # TODO: Dumb but we need to know how many nodes there are first
+        subconverter = JaxprToOnnx(self.name_counter + 1)
+        subconverter.trace_jaxpr(gamma, (key, alpha))
+
+        # connect inputs/outputs to outer jaxpr
+        nodes = subconverter.nodes
+        initializers = subconverter.initializers
+        inputs = subconverter.inputs
+        outputs = subconverter.outputs
+
+        assert len(node_inputs) == len(inputs)
+        assert len(node_outputs) == len(outputs)
 
 
-        # output_name = self._get_var_name(node_outputs[0])
-        # shape = node_outputs[0].aval.shape
+        for o_invar, i_invar in zip(node_inputs, inputs):
+            o_invar_name = self._get_name(o_invar)
+            i_invar_name = i_invar.name
+            node = helper.make_node(
+                "Identity",
+                inputs = [o_invar_name],
+                outputs = [i_invar_name],
+                name = self._get_unique_name("gamma_input")
+            )
+            self.nodes.append(node)
 
-        # one_third = self._get_constant_name(np.array([1/3], dtype=np.float32))
+        self.nodes += nodes
+        self.initializers += initializers
+        self.name_counter += (subconverter.name_counter - subconverter._name_counter_init)
 
-        # c_node = helper.make_node(
-        #     "Sub",
-        #     inputs = [alpha, one_third],
-        #     outputs = [output_name],
-        #     name=self._get_unique_name("gamma_sub"),
-        # )
+        for o_outvar, i_outvar in zip(node_outputs, outputs):
+            o_outvar_name = self._get_name(o_outvar)
+            i_outvar_name = i_outvar.name
+            node = helper.make_node(
+                "Identity",
+                inputs = [i_outvar_name],
+                outputs = [o_outvar_name],
+                name = self._get_unique_name("gamma_output")
+            )
+            self.nodes.append(node)
 
-        # self.nodes.append(c_node)
-        
     def _handle_convert_element_type(self, node_inputs, node_outputs, params):
         input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])   
@@ -1023,6 +1047,8 @@ class JaxprToOnnx:
             self._handle_random_normal(jaxpr.invars, jaxpr.outvars, jaxpr.params)
         elif name == "_uniform":
             self._handle_random_uniform(jaxpr.invars, jaxpr.outvars, jaxpr.params)
+        elif name == "_gamma":
+            self._process_closed_jaxpr(jaxpr)
         elif name == "clip":
             self._process_closed_jaxpr(jaxpr)
         elif name == "sort":
@@ -1032,8 +1058,6 @@ class JaxprToOnnx:
         elif name == "_gumbel":
             self._process_closed_jaxpr(jaxpr)
         elif name == "_dirichlet":
-            self._process_closed_jaxpr(jaxpr)
-        elif name == "_gamma":
             self._process_closed_jaxpr(jaxpr)
         else:
             raise NotImplementedError(f"pjit {jaxpr.params["name"]} not yet handled")
