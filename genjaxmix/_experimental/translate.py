@@ -88,7 +88,10 @@ class JaxprToOnnx:
         
         np_val = np.array(actual_val)
         # if np_val.dtype == np.int64:
-        #     np_val = np_val.astype(np.int32)
+            # np_val = np_val.astype(np.int32)
+        if np_val.dtype == np.float64:
+            np_val = np_val.astype(np.float32)
+
         tensor = helper.make_tensor(
             name=name,
             data_type=self._numpy_dtype_to_onnx(np_val.dtype),
@@ -856,6 +859,7 @@ class JaxprToOnnx:
 
     def _handle_sort(self, node_inputs, node_outputs, params):
         input_name = self._get_name(node_inputs[0]) 
+        shape_name = self._get_unique_name("sort_shape")
         value_name = self._get_var_name(node_outputs[0])
         indices_name = self._get_unique_name("sort_indices_output")
 
@@ -864,12 +868,20 @@ class JaxprToOnnx:
             K = node_inputs[0].aval.shape[axis]
             raise NotImplementedError("sort axis not supported yet")
         else:
-            K = node_inputs[0].aval.shape[0]
+            node = helper.make_node(
+                "Shape",
+                inputs=[input_name],
+                outputs=[shape_name],
+                name = self._get_unique_name("shape")
+            )
+            self.nodes.append(node)
         
-        K_name = self._get_constant_name(np.array([K], dtype=np.int64))
+        # to make sort more generic, we first find the shape
+        
+        # K_name = self._get_constant_name(np.array([K], dtype=np.int64))
         node = helper.make_node(
             "TopK",
-            inputs = [input_name, K_name],
+            inputs = [input_name, shape_name],
             outputs=[value_name, indices_name],
             name=self._get_unique_name("sort"),
             largest = 0
