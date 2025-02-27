@@ -26,11 +26,13 @@ class JaxprToOnnx:
             jax.lax.ne_p: self._handle_ne,
             jax.lax.lt_p: self._handle_lt,
             jax.lax.max_p: self._handle_max,
+            jax.lax.min_p: self._handle_min,
             jax.lax.select_n_p: self._handle_select_n,
             jax.lax.dot_general_p: self._handle_dot_general,
             jax.lax.reduce_sum_p: self._handle_reduce_sum,
             jax.lax.reduce_max_p: self._handle_reduce_max,
             jax.lax.reduce_min_p: self._handle_reduce_min,
+            jax.lax.gather_p: self._handle_gather,
             jax.lax.scatter_add_p: self._handle_scatter_add, # TODO: CHANGE
             jax.lax.argmax_p: self._handle_argmax,
             jax.lax.argmin_p: self._handle_argmin,
@@ -256,6 +258,19 @@ class JaxprToOnnx:
         )
         self.nodes.append(node)
 
+    def _handle_min(self, node_inputs, node_outputs, params):
+        """Handle JAX min primitive."""
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+
+        node = helper.make_node(
+            "Min",
+            inputs=input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("min")
+        )
+        self.nodes.append(node)
+
     def _handle_select_n(self, node_inputs, node_outputs, params):
         """Handle JAX select_n primitive."""
         input_names = [self._get_name(inp) for inp in node_inputs]
@@ -271,7 +286,7 @@ class JaxprToOnnx:
     
     def _handle_dot_general(self, node_inputs, node_outputs, params):
         """Handle JAX dot_general primitive."""
-        input_names = [self._get_var_name(inp) for inp in node_inputs]
+        input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
         
         # Extract dot_general parameters
@@ -296,7 +311,7 @@ class JaxprToOnnx:
     
     def _handle_reduce_sum(self, node_inputs, node_outputs, params):
         """Handle JAX reduce_sum primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Get axes and create constant for it
@@ -315,7 +330,7 @@ class JaxprToOnnx:
     
     def _handle_reduce_max(self, node_inputs, node_outputs, params):
         """Handle JAX reduce_max primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Get axes and create constant for it
@@ -334,7 +349,7 @@ class JaxprToOnnx:
     
     def _handle_reduce_min(self, node_inputs, node_outputs, params):
         """Handle JAX reduce_min primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Get axes and create constant for it
@@ -350,6 +365,20 @@ class JaxprToOnnx:
             keepdims=0 if not params.get("keepdims", False) else 1
         )
         self.nodes.append(node)
+    
+    def _handle_gather(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(imp) for imp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])
+
+        node = helper.make_node(
+            "GatherElements",
+            inputs = input_names,
+            outputs=[output_name],
+            name=self._get_unique_name("gather"),
+        )
+
+        self.nodes.append(node)
+
 
     def _handle_scatter_add(self, node_inputs, node_outputs, params):
         input_names = [self._get_name(imp) for imp in node_inputs]
@@ -487,7 +516,7 @@ class JaxprToOnnx:
     
     def _handle_tanh(self, node_inputs, node_outputs, params):
         """Handle JAX tanh primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         node = helper.make_node(
@@ -536,7 +565,7 @@ class JaxprToOnnx:
     
     def _handle_reshape(self, node_inputs, node_outputs, params):
         """Handle JAX reshape primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Get new shape and create constant for it
@@ -554,7 +583,7 @@ class JaxprToOnnx:
     
     def _handle_transpose(self, node_inputs, node_outputs, params):
         """Handle JAX transpose primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Get permutation
@@ -647,7 +676,7 @@ class JaxprToOnnx:
     
     def _handle_concatenate(self, node_inputs, node_outputs, params):
         """Handle JAX concatenate primitive."""
-        input_names = [self._get_var_name(inp) for inp in node_inputs]
+        input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
         
         # Get concatenation axis
@@ -666,9 +695,9 @@ class JaxprToOnnx:
     def _handle_conv(self, node_inputs, node_outputs, params):
         """Handle JAX conv_general_dilated primitive."""
         # This is a simplified implementation for common cases
-        input_name = self._get_var_name(node_inputs[0])  # input
-        filter_name = self._get_var_name(node_inputs[1])  # weights
-        output_name = self._get_var_name(node_outputs[0])
+        input_name = self._get_name(node_inputs[0])  # input
+        filter_name = self._get_name(node_inputs[1])  # weights
+        output_name = self._get_name(node_outputs[0])
         
         # Extract parameters
         dimension_numbers = params["dimension_numbers"]
@@ -699,7 +728,7 @@ class JaxprToOnnx:
     
     def _handle_max_pool(self, node_inputs, node_outputs, params):
         """Handle JAX max_pool primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Extract parameters
@@ -721,7 +750,7 @@ class JaxprToOnnx:
     
     def _handle_avg_pool(self, node_inputs, node_outputs, params):
         """Handle JAX avg_pool primitive."""
-        input_name = self._get_var_name(node_inputs[0])
+        input_name = self._get_name(node_inputs[0])
         output_name = self._get_var_name(node_outputs[0])
         
         # Extract parameters
@@ -822,7 +851,6 @@ class JaxprToOnnx:
             np_val = np_val.astype(np.int32)
         elif np_val.dtype == np.float64:
             np_val = np_val.astype(np.float32)
-        print("DEVICE PUT ", np_val, " ", np_val.dtype)
 
         tensor = helper.make_tensor(
             name=name,
