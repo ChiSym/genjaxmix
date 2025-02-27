@@ -931,21 +931,6 @@ class JaxprToOnnx:
         return X
         """
         # Create a jaxpr and run JaxprToOnnx to build the CG
-        def gamma(key, alpha):
-            d = alpha - 1/3
-            c = 1 / jnp.sqrt(9 * d)
-            z = jax.random.normal(key, alpha.shape)
-            v = (1+c*z)**3
-            u = jax.random.uniform(key, alpha.shape)
-            x = d * v
-
-            acceptance = (v > 0) & (jnp.log(u) < (0.5 * z**2 + d - d*v + d * jnp.log(v)))
-
-            z = jax.random.normal(key)
-            v = (1+c*z)**3
-            x = jnp.where(acceptance, x, d * v)
-
-            return x
 
         shape = node_inputs[1].aval.shape
         key = jax.random.key(0)
@@ -1214,61 +1199,74 @@ def example():
     model_path = converter.convert(example_fn, (x, y), "example_model.onnx")
     print(f"ONNX model saved to: {model_path}")
 
+def gamma(key, alpha):
+    d = alpha - 1/3
+    c = 1 / jnp.sqrt(9 * d)
+    z = jax.random.normal(key, alpha.shape)
+    v = (1+c*z)**3
+    u = jax.random.uniform(key, alpha.shape)
+    x = d * v
 
+    acceptance = (v > 0) & (jnp.log(u) < (0.5 * z**2 + d - d*v + d * jnp.log(v)))
+
+    z = jax.random.normal(key, alpha.shape)
+    v = (1+c*z)**3
+    x = jnp.where(acceptance, x, d * v)
+
+    return x
 # More complex example
-def complex_example():
+# def complex_example():
     # Define a small CNN
-    def cnn_fn(x):
-        # Convolution
-        w = jnp.ones((16, 3, 3, 3))  # [out_channels, in_channels, height, width]
-        x = jax.lax.conv_general_dilated(
-            x, w, 
-            window_strides=(1, 1),
-            padding="SAME",
-            dimension_numbers=('NHWC', 'OHWI', 'NHWC')
-        )
-        # ReLU
-        x = jnp.maximum(x, 0)
-        # Max pooling
-        # x = jax.lax.reduce_window(
-        #     x,
-        #     init_value=-jnp.inf,
-        #     computation=jax.lax.max,
-        #     window_dimensions=(1, 2, 2, 1),
-        #     window_strides=(1, 2, 2, 1),
-        #     padding='VALID'
-        # )
-        # Flatten
-        batch_size = x.shape[0]
-        x = x.reshape(batch_size, -1)
-        # Dense layer
-        w2 = jnp.ones((x.shape[1], 10))
-        x = jnp.dot(x, w2)
-        # Softmax
-        x = jax.nn.softmax(x)
-        return x
+#     def cnn_fn(x):
+#         # Convolution
+#         w = jnp.ones((16, 3, 3, 3))  # [out_channels, in_channels, height, width]
+#         x = jax.lax.conv_general_dilated(
+#             x, w, 
+#             window_strides=(1, 1),
+#             padding="SAME",
+#             dimension_numbers=('NHWC', 'OHWI', 'NHWC')
+#         )
+#         # ReLU
+#         x = jnp.maximum(x, 0)
+#         # Max pooling
+#         # x = jax.lax.reduce_window(
+#         #     x,
+#         #     init_value=-jnp.inf,
+#         #     computation=jax.lax.max,
+#         #     window_dimensions=(1, 2, 2, 1),
+#         #     window_strides=(1, 2, 2, 1),
+#         #     padding='VALID'
+#         # )
+#         # Flatten
+#         batch_size = x.shape[0]
+#         x = x.reshape(batch_size, -1)
+#         # Dense layer
+#         w2 = jnp.ones((x.shape[1], 10))
+#         x = jnp.dot(x, w2)
+#         # Softmax
+#         x = jax.nn.softmax(x)
+#         return x
     
-    # Create input
-    x = jnp.ones((1, 28, 28, 3))  # [batch, height, width, channels]
+#     # Create input
+#     x = jnp.ones((1, 28, 28, 3))  # [batch, height, width, channels]
     
-    # Convert to ONNX
-    converter = JaxprToOnnx()
-    model_path = converter.convert(cnn_fn, (x,), "cnn_model.onnx")
-    print(f"CNN model saved to: {model_path}")
+#     # Convert to ONNX
+#     converter = JaxprToOnnx()
+#     model_path = converter.convert(cnn_fn, (x,), "cnn_model.onnx")
+#     print(f"CNN model saved to: {model_path}")
 
-def random_example():
-    def model(key):
-        x = jax.random.normal(key)
-        y = x + 1.0
-        return y
+# def random_example():
+#     def model(key):
+#         x = jax.random.normal(key)
+#         y = x + 1.0
+#         return y
     
-    key = jax.random.key(0)
-    converter = JaxprToOnnx()
-    model_path = converter.convert(model, (key,), "gaussian.onnx")
-    print(f"Gaussian noise saved to {model_path}")
-
-if __name__ == "__main__":
-    # example()
-    # Uncomment to run the more complex example
-    # complex_example()
-    random_example()
+#     key = jax.random.key(0)
+#     converter = JaxprToOnnx()
+#     model_path = converter.convert(model, (key,), "gaussian.onnx")
+#     print(f"Gaussian noise saved to {model_path}")
+# if __name__ == "__main__":
+#     # example()
+#     # Uncomment to run the more complex example
+#     # complex_example()
+#     random_example()
