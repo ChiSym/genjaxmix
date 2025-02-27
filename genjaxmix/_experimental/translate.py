@@ -53,6 +53,7 @@ class JaxprToOnnx:
             # jax.lax.sigmoid_p: self._handle_sigmoid,
             jax.lax.reshape_p: self._handle_reshape,
             jax.lax.transpose_p: self._handle_transpose,
+            jax.lax.squeeze_p: self._handle_squeeze,
             jax.lax.broadcast_in_dim_p: self._handle_broadcast_in_dim,
             jax.lax.slice_p: self._handle_slice,
             jax.lax.concatenate_p: self._handle_concatenate,
@@ -61,6 +62,8 @@ class JaxprToOnnx:
             jax.lax.sort_p: self._handle_sort,
             jax._src.prng.random_seed_p: None, # TODO: CHANGE
             jax._src.prng.random_wrap_p: self._handle_identity, # TODO: CHANGE
+            jax._src.prng.random_split_p: self._handle_identity,
+            jax._src.prng.random_unwrap_p: self._handle_identity,
             jax.lax.convert_element_type_p: self._handle_convert_element_type, # TODO: CHANGE
             jax.lax.device_put_p: self._handle_device_put, # TODO: CHANGE
             jax.random.random_gamma_p: self._handle_random_gamma,
@@ -88,8 +91,6 @@ class JaxprToOnnx:
             actual_val = val
         
         np_val = np.array(actual_val)
-        # if np_val.dtype == np.int64:
-            # np_val = np_val.astype(np.int32)
         if np_val.dtype == np.float64:
             np_val = np_val.astype(np.float32)
 
@@ -238,6 +239,7 @@ class JaxprToOnnx:
         self.nodes.append(node)
 
     def _handle_eq(self, node_inputs, node_outputs, params):
+        """Handle JAX eq primitive"""
         input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
         node = helper.make_node(
@@ -249,6 +251,7 @@ class JaxprToOnnx:
         self.nodes.append(node)
 
     def _handle_ne(self, node_inputs, node_outputs, params):
+        """Handle JAX ne primitive"""
         input_names = [self._get_name(inp) for inp in node_inputs]
         eq_output = self._get_unique_name("equal_output")
         output_name = self._get_var_name(node_outputs[0])
@@ -306,6 +309,7 @@ class JaxprToOnnx:
 
 
     def _handle_lt(self, node_inputs, node_outputs, params):
+        """Handle JAX lt primitive"""
         input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
         node = helper.make_node(
@@ -317,6 +321,7 @@ class JaxprToOnnx:
         self.nodes.append(node)
 
     def _handle_gt(self, node_inputs, node_outputs, params):
+        """Handle JAX gt primitive"""
         input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
         node = helper.make_node(
@@ -700,6 +705,26 @@ class JaxprToOnnx:
         )
         self.nodes.append(node)
     
+    def _handle_squeeze(self, node_inputs, node_outputs, params):
+        """Handle JAX squeeze primitive."""
+        input_name = self._get_name(node_inputs[0])
+        output_name = self._get_var_name(node_outputs[0])
+        
+        # Get permutation
+        dims = params["dimensions"]
+        axes = self._get_constant_name(np.array(dims, dtype=np.int64))
+        
+        # Create Transpose node
+        node = helper.make_node(
+            "Squeeze",
+            inputs=[input_name],
+            outputs=[output_name],
+            name=self._get_unique_name("squeeze"),
+            axes=axes
+        )
+        self.nodes.append(node)
+
+    
     def _handle_broadcast_in_dim(self, node_inputs, node_outputs, params):
         """Handle JAX broadcast_in_dim primitive."""
         input_name = self._get_name(node_inputs[0])
@@ -872,6 +897,7 @@ class JaxprToOnnx:
         self.nodes.append(node)
 
     def _handle_sort(self, node_inputs, node_outputs, params):
+        """Handle JAX sort primitive"""
         input_name = self._get_name(node_inputs[0]) 
         shape_name = self._get_unique_name("sort_shape")
         value_name = self._get_var_name(node_outputs[0])
@@ -936,6 +962,8 @@ class JaxprToOnnx:
     
     def _handle_random_gamma(self, node_inputs, node_outputs, params):
         """
+        Handle JAX gamma primitive
+
         between Marsaglia-Tang and Cheng, we decided on the former due to the low rejection rate
         https://kth.diva-portal.org/smash/get/diva2:1935824/FULLTEXT02.pdf
 
