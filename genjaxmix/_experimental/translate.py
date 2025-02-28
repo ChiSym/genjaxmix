@@ -58,14 +58,14 @@ class JaxprToOnnx:
             jax.lax.slice_p: self._handle_slice,
             jax.lax.concatenate_p: self._handle_concatenate,
             jax.lax.conv_general_dilated_p: self._handle_conv,
-            jax.lax.stop_gradient_p: self._handle_identity,
             jax.lax.sort_p: self._handle_sort,
-            jax._src.prng.random_seed_p: None, # TODO: CHANGE
-            jax._src.prng.random_wrap_p: self._handle_identity, # TODO: CHANGE
-            jax._src.prng.random_split_p: self._handle_identity,
-            jax._src.prng.random_unwrap_p: self._handle_identity,
+            jax.lax.stop_gradient_p: self._handle_stop_gradient, 
+            jax._src.prng.random_seed_p: self._handle_random_seed, 
+            jax._src.prng.random_wrap_p: self._handle_random_wrap, 
+            jax._src.prng.random_split_p: self._handle_random_split,
+            jax._src.prng.random_unwrap_p: self._handle_random_unwrap,
             jax.lax.convert_element_type_p: self._handle_convert_element_type, # TODO: CHANGE
-            jax.lax.device_put_p: self._handle_device_put, # TODO: CHANGE
+            jax.lax.device_put_p: self._handle_device_put,
             jax.random.random_gamma_p: self._handle_random_gamma,
         }
     
@@ -161,7 +161,82 @@ class JaxprToOnnx:
             "Identity",
             inputs = input_names,
             outputs = [output_name],
-            name = self._get_unique_name("ident/stop_gradient")
+            name = self._get_unique_name("identity")
+        )
+        self.nodes.append(node)
+
+    def _handle_stop_gradient(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])   
+
+        node = helper.make_node(
+            "Identity",
+            inputs = input_names,
+            outputs = [output_name],
+            name = self._get_unique_name("stop_gradient")
+        )
+        self.nodes.append(node)
+
+    def _handle_random_seed(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])   
+
+        node = helper.make_node(
+            "Identity",
+            inputs = input_names,
+            outputs = [output_name],
+            name = self._get_unique_name("random_seed")
+        )
+        self.nodes.append(node)
+
+    def _handle_random_wrap(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])   
+
+        node = helper.make_node(
+            "Identity",
+            inputs = input_names,
+            outputs = [output_name],
+            name = self._get_unique_name("random_wrap")
+        )
+        self.nodes.append(node)
+
+    def _handle_random_split(self, node_inputs, node_outputs, params):
+        input_name = self._get_name(node_inputs[0])
+        intermediate = self._get_unique_name("random_split:x")
+        output_name = self._get_var_name(node_outputs[0])   
+
+        reshape = self._get_constant_name(np.array([1, 2], dtype=np.int64))
+
+        num = params['shape'][0]
+        repeat = self._get_constant_name(np.array([num,1], dtype=np.int64))
+
+
+        node_1 = helper.make_node(
+            "Reshape", 
+            inputs = [input_name, reshape],
+            outputs = [intermediate],
+            name = self._get_unique_name("random_split:reshape")
+        )
+        self.nodes.append(node_1)
+
+        node_2 = helper.make_node(
+            "Tile",
+            inputs = [intermediate, repeat],
+            outputs = [output_name],
+            name = self._get_unique_name("random_split:tile")
+        )
+        self.nodes.append(node_2)
+
+    def _handle_random_unwrap(self, node_inputs, node_outputs, params):
+        input_names = [self._get_name(inp) for inp in node_inputs]
+        output_name = self._get_var_name(node_outputs[0])   
+
+        node = helper.make_node(
+            "Identity",
+            inputs = input_names,
+            outputs = [output_name],
+            name = self._get_unique_name("random_wrap")
         )
         self.nodes.append(node)
 
@@ -717,10 +792,9 @@ class JaxprToOnnx:
         # Create Transpose node
         node = helper.make_node(
             "Squeeze",
-            inputs=[input_name],
+            inputs=[input_name, axes],
             outputs=[output_name],
             name=self._get_unique_name("squeeze"),
-            axes=axes
         )
         self.nodes.append(node)
 
@@ -927,9 +1001,6 @@ class JaxprToOnnx:
 
         self.nodes.append(node)
 
-    def _handle_random_wrap(self, node_inputs, node_outputs, params):
-        raise NotImplementedError("_handle_random_wrap")
-    
     def _handle_random_uniform(self, node_inputs, node_outputs, params):
         # input_names = [self._get_name(inp) for inp in node_inputs]
         output_name = self._get_var_name(node_outputs[0])
