@@ -9,6 +9,7 @@ def test_basic():
             super().__init__()
             self.gamma = dsl.Gamma(jnp.ones((3, 2)), jnp.ones((3, 2)))
             self.normal = dsl.Normal(jnp.zeros((3, 2)), self.gamma)
+
         def observations(self):
             return ["normal"]
 
@@ -21,9 +22,7 @@ def test_basic():
     ordering = model.ordering
 
     expected_edges = {0: [2, 3], 1: [4, 0], 2: [], 3: [], 4: []}
-    assert expected_edges == edges, (
-        f"Expected {expected_edges}, but got {edges}"
-    )
+    assert expected_edges == edges, f"Expected {expected_edges}, but got {edges}"
 
     expected_backedges = {0: [1], 1: [], 2: [0], 3: [0], 4: [1]}
     assert expected_backedges == backedges, (
@@ -38,9 +37,7 @@ def test_basic():
         dsl.Constant,
     ]
 
-    assert expected_types == types, (
-        f"Expected {expected_types}, but got {types}"
-    )
+    assert expected_types == types, f"Expected {expected_types}, but got {types}"
     expected_ordering = [4, 3, 2, 0, 1]
 
     assert expected_ordering == ordering, (

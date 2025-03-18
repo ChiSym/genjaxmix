@@ -2,14 +2,21 @@ import jax
 import jax.numpy as jnp
 from abc import ABC, abstractmethod, ABCMeta
 from genjaxmix.model.utils import count_unique, topological_sort
-from genjaxmix.model.compile import MarkovBlanket, build_loglikelihood_at_node, build_parameter_proposal, gibbs_pi
+from genjaxmix.model.compile import (
+    MarkovBlanket,
+    build_loglikelihood_at_node,
+    build_parameter_proposal,
+    gibbs_pi,
+)
 import genjaxmix.model.dsl as dsl
+
 
 class PostInitCaller(ABCMeta):
     def __call__(cls, *args, **kwargs):
         obj = type.__call__(cls, *args, **kwargs)
         obj.__post_init__()
         return obj
+
 
 class Model(ABC):
     def __init__(self):
@@ -203,7 +210,7 @@ class Model(ABC):
 
         self.assignment_proposal = assignment_proposal
         return self.assignment_proposal
-    
+
     def sample(self, key):
         environment = dict()
         for id in self.ordering:

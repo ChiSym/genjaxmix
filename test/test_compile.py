@@ -1,7 +1,3 @@
-import genjaxmix.model.dsl as dsl
-import genjaxmix.model as mm
-import jax.numpy as jnp
-
 def test_blanket_1():
     # gamma = dsl.Gamma(jnp.ones((3, 2)), jnp.ones((3, 2)))
     # normal = dsl.Normal(jnp.zeros((3, 2)), gamma)

@@ -10,6 +10,7 @@ from genjaxmix.analytical.posterior import (
     get_posterior_sampler,
 )
 
+
 @dataclass
 class MarkovBlanket:
     id: int

@@ -1,4 +1,4 @@
-GenJAXMix is a GenJAX-accelerated Dirichlet Process Mixture Modeling package for heterogenous tabular data. 
+GenJAXMix is a GenJAX-accelerated Dirichlet Process Mixture Modeling package for heterogenous tabular data.
 
 # Installation
 

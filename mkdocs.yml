@@ -13,13 +13,13 @@ plugins:
             show_source: false
 
 
-nav: 
+nav:
   - Home: index.md
-  - Tutorials: 
+  - Tutorials:
     - Getting Started: tutorials/getting_started.py
     - DPMMs from the Ground Up: tutorials/dpmm_ground_up.ipynb
     - Splitting Clusters: tutorials/sub_cluster.ipynb
-  - Library Reference: 
+  - Library Reference:
     - API: reference/api.md
     - Conjugacy: reference/conjugacy.md
     - Inference: reference/inference.md
