@@ -47,7 +47,7 @@ jobs:
       - name: Test
         run: uv run pytest test --doctest-modules --junitxml=junit/test-results.xml --cov=genjaxmix --cov-report=xml:coverage/coverage.xml --cov-report=html:coverage/htmlcov
       - name: Store coverage files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage
           path: coverage

@@ -63,7 +63,7 @@ jobs:
             uv sync --group docs
       - name: Makedocs Build
         run: uv run mkdocs build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         id: docs-artifact
         with:
           name: stable-docs
